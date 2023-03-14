@@ -145,52 +145,69 @@ class BassTab:
                 return i
         return -1
     
-    def parse_tab_line(self, line):
-        """
-        Parses a single line of a tab and returns the notes until the third "|".
-        If there are characters after the third "|" sign, it returns them separately as a repeat.
     
-        Parameters
-        ----------
-        line : str
-            The tab line to be parsed.
+    def print_bassline(self):
+        print(self.artist,"-",self.song_name)
+        for i in self.repeat_indices:
+            if i!=0:
+                print("G"+self.G[i-1])
+                print("D"+self.D[i-1])
+                print("A"+self.A[i-1])
+                print("E"+self.E[i-1],'\n')
+            else: print('SKIP LINE!')
     
-        Returns
-        -------
-        output : str
-            The notes in the line until the third "|".
-        repeat : int or None
-            The repeat count of the notes after the third "|" sign. If no repeat count is found, returns None.
-        isempty : bool
-            Is true when the complete bassline did not contain any notes
-        """
-        # Initialize variables
-        output = ""
-        pipe_count = 0
-        remaining = ""
-        isempty = True # will be used to check if there are digits in the bassline
-        
-        # Loop through characters in the line
-        for c in line:
-            if c == "|":
-                pipe_count += 1
-                if pipe_count == 3:
-                    # Save remaining characters after third "|" sign
-                    remaining = line[line.index("|", line.index("|", line.index("|") + 1) + 1) + 1:]
-                    output += c
-                    break
-            output += c
-            if c.isdigit(): isempty = False
-            
-        # Check for repeat count in remaining characters
-        for r in remaining:
-            if r == "x":
-                if remaining[remaining.index("x")+2].isdigit():
-                    repeat = int(remaining[remaining.index("x")+1] + remaining[remaining.index("x")+2])
-                elif remaining[remaining.index("x")+1].isdigit():
-                    repeat = int(remaining[remaining.index("x")+1])
-                else: repeat = None
+    
+def parse_tab_line(line):
+    """
+    Parses a single line of a tab and returns the notes until the third "|".
+    If there are characters after the third "|" sign, it returns them separately as a repeat.
+
+    Parameters
+    ----------
+    line : str
+        The tab line to be parsed.
+
+    Returns
+    -------
+    output : str
+        The notes in the line until the third "|".
+    repeat : int or None
+        The repeat count of the notes after the third "|" sign. If no repeat count is found, returns None.
+    isempty : bool
+        Is true when the complete bassline did not contain any notes
+    """
+    # Initialize variables
+    output = ""
+    pipe_count = 0
+    remaining = ""
+    isempty = True # will be used to check if there are digits in the bassline
+    
+    line.replace(":","")
+    line.replace(";","")
+    maxpipe_count = line.count("|")
+    
+    # Loop through characters in the line
+    for c in line:
+        if c == "|":
+            pipe_count += 1
+            if pipe_count == maxpipe_count:
+                # Save remaining characters after third "|" sign
+                if maxpipe_count==2: remaining = line[line.index("|", line.index("|") + 1) + 1:]
+                else: remaining = line[line.index("|", line.index("|", line.index("|") + 1) + 1) + 1:]
+                output += c
                 break
+        output += c
+        if c.isdigit(): isempty = False
+        
+    # Check for repeat count in remaining characters
+    repeat = None
+    for r in remaining:
+        if r == "x":
+            if remaining[remaining.index("x")+2].isdigit():
+                repeat = int(remaining[remaining.index("x")+1] + remaining[remaining.index("x")+2])
+            elif remaining[remaining.index("x")+1].isdigit():
+                repeat = int(remaining[remaining.index("x")+1])
             else: repeat = None
-                    
-        return output, repeat, isempty
+            break
+                
+    return output, repeat, isempty
