@@ -185,7 +185,7 @@ class BassTab:
                     count[j] = strings[j][i]+strings[j][i+1] 
                     
                     # special characters
-                    if i < bar_len-2 and strings[j][i+2] in "/\sShHpPbB~*":
+                    if i < bar_len-2 and strings[j][i+2] in "/\sShHpPbB^~*":
                         containsspecial = True
                         if strings[j][i+2] in "/\sS":
                             count[4] = "s"
@@ -193,7 +193,7 @@ class BassTab:
                             count[4] = "h"
                         elif strings[j][i+2] in "pP":
                             count[4] = "p"
-                        elif strings[j][i+2] in "bB":
+                        elif strings[j][i+2] in "bB^":
                             count[4] = "b"
                         else:
                             count[4] = strings[j][i+2]
@@ -203,7 +203,7 @@ class BassTab:
                     count[j] = strings[j][i]
                     
                     # special characters
-                    if i < bar_len-1 and strings[j][i+1] in "/\sShHpPbB~*":
+                    if i < bar_len-1 and strings[j][i+1] in "/\sShHpPbB^~*":
                         containsspecial = True
                         if strings[j][i+1] in "/\sS":
                             count[4] = "s"
@@ -211,7 +211,7 @@ class BassTab:
                             count[4] = "h"
                         elif strings[j][i+1] in "pP":
                             count[4] = "p"
-                        elif strings[j][i+1] in "bB":
+                        elif strings[j][i+1] in "bB^":
                             count[4] = "b"
                         else:
                             count[4] = strings[j][i+1]
@@ -265,7 +265,7 @@ class BassTab:
             else: dash="-"
             
             # contains special characters
-            if len(count[4])!=0 and count[4] in "/\sShHpPbB~*":
+            if len(count[4])!=0 and count[4] in "/\sShHpPbB^~*":
                 if count[0].isdigit(): E += count[0]+count[4]
                 else: E += dash+'-'
                 if count[1].isdigit(): A += count[1]+count[4]
@@ -331,8 +331,6 @@ def parse_tab_line(line):
         result += line[i]
     line = result
     
-    line.replace(":","")
-    line.replace(";","")
     maxpipe_count = line.count("|")
     
     # Loop through characters in the line

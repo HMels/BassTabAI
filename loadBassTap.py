@@ -25,7 +25,10 @@ def load_bassTab(url):
         
         data_content = soup.find('div', {'class': 'js-store'})['data-content']
         data = json.loads(data_content)
-    except: print("URL cannot be loaded")
+    except: 
+        print("URL cannot be loaded")
+        return None
+    
     '''
     try:
         if (data['store']['page']['data']['tab_view']['meta']['tuning']['value']!='Eb Ab Db Gb' or 
@@ -37,8 +40,17 @@ def load_bassTab(url):
         if not data['store']['page']['data']['tab']['type']=='Bass Tabs':
             print('Warning, not a bass tab that is being loaded. Returning None')
             return None
-    except: print('Type not found')
-
+    except: 
+        pass
+    
+    try:
+        if data['store']['page']['data']['tab_view']['meta']['tuning']['value']=='D A D G':
+            print(data['store']['page']['data']['tab']["artist_name"],data['store']['page']['data']['tab']["song_name"],
+                  "in drop-D tuning. So we skip it!")
+            return None
+    except:
+        pass
+    
     try:
         # Now you can access the data you are interested in using dictionary keys
         tab = data['store']['page']['data']['tab_view']['wiki_tab']['content']
@@ -58,34 +70,53 @@ def load_bassTab(url):
         repeat_tot=0
         repeat=0
         for line in tab_lines:
-            if line.startswith(("[tab]G|")):
-                G_new, repeat, Gisempty = parse_tab_line(line[6:])
-                Gfound=True
+            
+            #  all the ways the program might fail
+            line=line.replace(":","")
+            line=line.replace(";","")
+            line=line.replace("G-","G|-")
+            line=line.replace("Gb-","G|-")
+            line=line.replace("A-","G|-")
+            line=line.replace("Ab-","G|-")
+            line=line.replace("D-","G|-")
+            line=line.replace("Db-","G|-")
+            if "E-mail" not in line:
+                line=line.replace("E-","G|-")
+            line=line.replace("Eb-","G|-")
+            if line[-2:]=="-\r":
+                line=line.replace("-\r","-|\r")
+            if line[-8:]=='-[/tab]\r':
+                line=line.replace('-[/tab]\r','-|[/tab]\r')
+            
+            # we only have standard tuning and tuning a half step lower. Drop D is ignored
             if line.startswith(("[tab]Gb|")):
                 G_new, repeat, Gisempty = parse_tab_line(line[7:])
                 Gfound=True
-            if line.startswith(("G|")):
-                G_new, repeat, Gisempty = parse_tab_line(line[1:])
+            elif line.startswith(("[tab]G|")):
+                G_new, repeat, Gisempty = parse_tab_line(line[6:])
                 Gfound=True
-            if line.startswith(("Gb|")):
+            elif line.startswith(("Gb|")):
                 G_new, repeat, Gisempty = parse_tab_line(line[2:])
                 Gfound=True
-            if line.startswith(("D|")):
-                D_new, repeat, Disempty = parse_tab_line(line[1:])
-                Dfound=True
-            if line.startswith(("Db|")):
+            elif line.startswith(("G|")):
+                G_new, repeat, Gisempty = parse_tab_line(line[1:])
+                Gfound=True
+            elif line.startswith(("Db|")):
                 D_new, repeat, Disempty = parse_tab_line(line[2:])
                 Dfound=True
-            if line.startswith(("A|")):
-                A_new, repeat, Aisempty = parse_tab_line(line[1:])
-                Afound=True
-            if line.startswith(("Ab|")):
+            elif line.startswith(("D|")):
+                D_new, repeat, Disempty = parse_tab_line(line[1:])
+                Dfound=True
+            elif line.startswith(("Ab|")):
                 A_new, repeat, Aisempty = parse_tab_line(line[2:])
                 Afound=True
-            if line.startswith(("E|")):
-                E_new, repeat, Eisempty = parse_tab_line(line[1:])
+            elif line.startswith(("A|")):
+                A_new, repeat, Aisempty = parse_tab_line(line[1:])
+                Afound=True
+            elif line.startswith(("Eb|")):
+                E_new, repeat, Eisempty = parse_tab_line(line[2:])
                 Efound=True
-            if line.startswith(("Eb|")):
+            elif line.startswith(("E|")):
                 E_new, repeat, Eisempty = parse_tab_line(line[1:])
                 Efound=True
             if repeat is not None and repeat>repeat_tot: repeat_tot=repeat
@@ -111,10 +142,9 @@ def load_bassTab(url):
         else: 
             print("Cannot access",url)
             return None
-    
-    
+
     except:
-        print('UNKNOWN ERROR! Returning None')
+        print('UNKNOWN ERROR! for',url)
         return None
 
 
@@ -125,10 +155,10 @@ from tqdm import tqdm
 ##TODO right now we only have rock
 url1 = "https://www.ultimate-guitar.com/explore?genres[]=4&page="
 url2 = "&type[]=Bass%20Tabs"
-N = 100 # total number of pages to scrape
+N = 1 # total number of pages to scrape
 
 # List to store all the bassTab objects
-bassTabs = []
+tokenized_inputs = []
 
 for i in tqdm(range(N)):
     url = url1+str(i)+url2
@@ -150,5 +180,19 @@ for i in tqdm(range(N)):
         if BT is not None:
             #BT.print_bassline_unique()
             print(BT.artist, BT.name)
-            bassTabs.append(BT)
+            tokenized_inputs.append(BT.token)
             
+            
+#%% save the tokens
+import pickle
+
+# Assuming your tokenized inputs are stored in a list called 'tokenized_inputs'
+# Save the list using Pickle
+with open('tokenized_inputs.pickle', 'wb') as f:
+    pickle.dump(tokenized_inputs, f)
+
+
+#%%
+# Load the list back from the Pickle file
+#with open('tokenized_inputs.pickle', 'rb') as f:
+#    tokenized_inputs = pickle.load(f)
