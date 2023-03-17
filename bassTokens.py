@@ -38,18 +38,38 @@ class BassTokens:
                     count[j] = self.dict_frets[strings[j][i]+strings[j][i+1]]
                     
                     # special characters
-                    if i < bar_len-2 and strings[j][i+2] in "/\\sShHpPbB^~*":
+                    if i < bar_len-2 and strings[j][i+2] in self.speciallist:
                         containsspecial = True
-                        count[4] = self.dict_special[strings[j][i+2]]
+                                                
+                        # we will correct the slides and pulloffs to be in the correct direction. Therefore we need to look
+                        # at which number comes after it, and if it is bigger or smaller
+                        if ( i < bar_len-4 and strings[j][i+3] in "0123456789" and strings[j][i+4] in "0123456789"
+                            and int(strings[j][i+3]+strings[j][i+4])<=20):
+                            count[4]=self.correct_special(strings[j][i]+strings[j][i+1], strings[j][i+2],
+                                                          strings[j][i+3]+strings[j][i+4])
+                        elif i < bar_len-3 and strings[j][i+3] in "0123456789":
+                            count[4]=self.correct_special(strings[j][i]+strings[j][i+1], strings[j][i+2], strings[j][i+3])
+                        else:
+                            count[4] = self.dict_special[strings[j][i+2]]
                         
                 # single digits
                 elif strings[j][i] in "0123456789":
                     count[j] = self.dict_frets[strings[j][i]]
                     
                     # special characters
-                    if i < bar_len-1 and strings[j][i+1] in "/\sShHpPbB^~*":
+                    if i < bar_len-1 and strings[j][i+1] in self.speciallist:
                         containsspecial = True
-                        count[4] = self.dict_special[strings[j][i+1]]
+                        
+                        # we will correct the slides and pulloffs to be in the correct direction. Therefore we need to look
+                        # at which number comes after it, and if it is bigger or smaller
+                        if ( i < bar_len-3 and strings[j][i+2] in "0123456789" and strings[j][i+3] in "0123456789"
+                            and int(strings[j][i+2]+strings[j][i+3])<=20):
+                            count[4]=self.correct_special(strings[j][i], strings[j][i+1],
+                                                          strings[j][i+2]+strings[j][i+3])
+                        elif i < bar_len-2 and strings[j][i+2] in "0123456789":
+                            count[4]=self.correct_special(strings[j][i], strings[j][i+1], strings[j][i+2])
+                        else:
+                            count[4] = self.dict_special[strings[j][i+1]]
                     
                 # dead note
                 elif strings[j][i] in "x":
@@ -128,6 +148,22 @@ class BassTokens:
         return G, D, A, E
     
     
+    def correct_special(self, note_1, special, note_2):
+        if special in '/\\sS':
+            if note_1.isdigit() and note_2.isdigit():
+                if int(note_1) > int(note_2):
+                    return self.dict_special['s']
+                else:
+                    return self.dict_special['/']
+        elif special in 'hHpP':
+            if int(note_1) > int(note_2):
+                return self.dict_special['p']
+            else:
+                return self.dict_special['h']                    
+        else:
+            return 0
+    
+    
     def generate_dicts(self):
         self.dict_frets = {
             '-': 0,
@@ -157,7 +193,7 @@ class BassTokens:
             }
         
         self.invdict_frets = {
-            0: '-',
+            0: '-', # no note
             1: '0',
             2: '1',
             3: '2',
@@ -179,35 +215,38 @@ class BassTokens:
             19: '18',
             20: '19',
             21: '20',
-            22: 'x',
-            23: '|',
+            22: 'x', # dead note
+            23: '|', # end of bar
             }
-
+        
+        self.speciallist = "/\\sShHpPbB^~*."
         
         self.dict_special= {
             '\\':1,
-            '/':1,
+            '/':2,
             's':1,
             'S':1,
-            'h':2,
-            'H':2,
-            'P':3,
-            'p':3,
-            'b':4,
-            'B':4,
-            '^':4,
-            '~':5,
-            '*':6,
-            'g':7
+            'h':3,
+            'H':3,
+            'P':4,
+            'p':4,
+            'b':5,
+            'B':5,
+            '^':5,
+            '~':6,
+            '*':7,
+            '.':7,
+            'g':8
             }
         
         self.invdict_special = {
             0:'',
-            1:'s',
-            2:'h',
-            3:'p',
-            4:'b',
-            5:'~',
-            6:'*',
-            7:'g'
+            1:'s', # slide down
+            2:'/', # slide up
+            3:'h', # hammer-on
+            4:'p', # pull-off
+            5:'b', # bend
+            6:'~', # let ring
+            7:'*', # Staccato
+            8:'g'  # grace note
             }
