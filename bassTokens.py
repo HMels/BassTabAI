@@ -5,6 +5,7 @@ Created on Wed Mar 15 12:30:20 2023
 @author: Mels
 """
 #import tensorflow as tf
+import numpy as np
 
 class BassTokens:
     def __init__(self, G,D,A,E, name="", artist="",genre=""):
@@ -12,9 +13,10 @@ class BassTokens:
         self.artist=artist if artist is not None else ""
         self.genre=genre if genre is not None else ""
         self.generate_dicts()
+        self.vectorized=False
         
         if len(G)!=len(D) and len(G)!=len(A) and len(G)!=len(E): raise ValueError("Objects [G,D,A,E] do not have equal length!")
-        self.token = self.tokenize_bar(G, D, A, E )
+        self.tokens = self.tokenize_bar(G, D, A, E )
             
     
     def tokenize_bar(self, G, D, A, E):
@@ -113,38 +115,56 @@ class BassTokens:
         
         
     def detokenize(self):
+        if self.vectorized: self.devectorize() # make sure the tokens are devectorized before tokenizing
+            
         G = ""
         D = ""
         A = ""
         E = ""
         
-        for count in self.token:
+        for count in self.tokens:
             if ( len(self.invdict_frets[count[0]])==2 or len(self.invdict_frets[count[1]])==2
                 or len(self.invdict_frets[count[2]])==2 or len(self.invdict_frets[count[3]])==2): dash="--"
             else: dash="-"
-            
+            G1,D1,A1,E1='','','',''
             # contains special characters
             if count[4]!=0:
-                if count[0]!=0: E += self.invdict_frets[count[0]]+self.invdict_special[count[4]]
-                else: E += dash+'-'
-                if count[1]!=0: A += self.invdict_frets[count[1]]+self.invdict_special[count[4]]
-                else: A += dash+'-'
-                if count[2]!=0: D += self.invdict_frets[count[2]]+self.invdict_special[count[4]]
-                else: D += dash+'-'
-                if count[3]!=0: G += self.invdict_frets[count[3]]+self.invdict_special[count[4]]
-                else: G += dash+'-'
+                if count[0]!=0: E1 += self.invdict_frets[count[0]]+self.invdict_special[count[4]]
+                else: E1 += dash+'-'
+                if count[1]!=0: A1 += self.invdict_frets[count[1]]+self.invdict_special[count[4]]
+                else: A1 += dash+'-'
+                if count[2]!=0: D1 += self.invdict_frets[count[2]]+self.invdict_special[count[4]]
+                else: D1 += dash+'-'
+                if count[3]!=0: G1 += self.invdict_frets[count[3]]+self.invdict_special[count[4]]
+                else: G1 += dash+'-'
                 
             # does not contain special characters
             else:
-                if count[0]!=0: E += self.invdict_frets[count[0]]
-                else: E += dash
-                if count[1]!=0: A += self.invdict_frets[count[1]]
-                else: A += dash
-                if count[2]!=0: D += self.invdict_frets[count[2]]
-                else: D += dash
-                if count[3]!=0: G += self.invdict_frets[count[3]]
-                else: G += dash
+                if count[0]!=0: E1 += self.invdict_frets[count[0]]
+                else: E1 += dash
+                if count[1]!=0: A1 += self.invdict_frets[count[1]]
+                else: A1 += dash
+                if count[2]!=0: D1 += self.invdict_frets[count[2]]
+                else: D1 += dash
+                if count[3]!=0: G1 += self.invdict_frets[count[3]]
+                else: G1 += dash
+                
+            # align all numbers with dashes
+            maxlen = max(len(G1),len(D1),len(A1),len(E1))
+            G1+= "-"*(maxlen-len(G1))
+            D1+= "-"*(maxlen-len(D1))
+            A1+= "-"*(maxlen-len(A1))
+            E1+= "-"*(maxlen-len(E1))
+            
+            G+=G1
+            D+=D1
+            A+=A1
+            E+=E1
                     
+        G = G.replace('||','|')
+        D = D.replace('||','|')
+        A = A.replace('||','|')
+        E = E.replace('||','|')
         return G, D, A, E
     
     
@@ -162,8 +182,71 @@ class BassTokens:
                 return self.dict_special['h']                    
         else:
             return 0
-    
-    
+        
+        
+    def vectorize(self):
+        self.Nfrets = len(self.invdict_frets)
+        self.Nspecial = len(self.invdict_special)
+        self.Nstrings = len(self.tokens[0]) -1
+        self.Nnotes = len(self.tokens)
+        
+        # we calculate the dimensions we need, In this case, no vector is a dash '-'
+        self.Ndim = 2 + self.Nstrings*(self.Nfrets-2) + self.Nspecial
+        vectorized_list = np.zeros([self.Nnotes, self.Ndim], dtype=np.int32)
+        
+        # the vector will have the next translations: 
+            # [0,0,0,...,0,0] -> '-'
+            # [0,1,0,...,0,0] -> '|'
+            # [0,0,x,...,0,0] -> notes from the fret dictionary. This goes from index 2 to Nstrings*(Nfrets-2)+2
+            # [0,0,...,x,0,0] -> notes from the special dictionary, This goes from index Nstrings*(Nfrets-2)+2 to the end
+        for i in range(self.Nnotes):
+            for j in range(self.Nstrings):
+                #TODO maybe [0,0,0,...,0,0] -> '-' should be changed to [1,0,0,...,0,0] -> '-'
+                
+                # the bar sign
+                if self.tokens[i][j]==self.dict_frets['|']:
+                    vectorized_list[i,1]=1
+                    
+                # the notes from the fret dictionary
+                elif self.tokens[i][j]!=0:
+                    index_j = 1 + j*(self.Nfrets-2) + self.tokens[i][j]
+                    vectorized_list[i,index_j]=1
+            
+            # special characters
+            if self.tokens[i][-1]!=0:
+                index_j = self.Ndim - self.Nspecial + self.tokens[i][-1]
+                vectorized_list[i,index_j]=1
+                
+        self.vectorized=True
+        self.tokens=vectorized_list
+                
+        
+    def devectorize(self):
+        original_list = [[0]*(self.Nstrings+1) for _ in range(self.Nnotes)]
+            
+        for i in range(self.Nnotes):
+            for j in range(self.Nstrings):
+                # the bar sign
+                if self.tokens[i,1] == 1:
+                    original_list[i][j] = self.dict_frets['|']
+                    
+                # the notes from the fret dictionary
+                else:
+                    index_j = 1 + j*(self.Nfrets-2)
+                    note_index = np.where(self.tokens[i, index_j+1:index_j+self.Nfrets-1] == 1)[0]
+                    if len(note_index)!=0:
+                        original_list[i][j] = int(note_index)+1 #if note_index != self.Nfrets-1 else 0 # if note is '-'
+            
+            # special characters         
+            special_index=np.where(self.tokens[i,-self.Nspecial:] == 1)[0]
+            if len(special_index)!=0:
+                original_list[i][-1] = int(special_index)# if special_index != self.Nspecial else 0 # if special character is '-'
+        
+        self.tokens=original_list
+        self.vectorized=False
+        #return original_list
+        
+
     def generate_dicts(self):
         self.dict_frets = {
             '-': 0,
@@ -248,5 +331,5 @@ class BassTokens:
             5:'b', # bend
             6:'~', # let ring
             7:'*', # Staccato
-            8:'g'  # grace note
+            8:'g'  # ghots note
             }

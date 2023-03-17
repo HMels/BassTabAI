@@ -109,6 +109,7 @@ class BassTab:
                 if index == -1: self.repeat_indices.append(len(self.E)) 
                 else: self.repeat_indices.append(index)
                 
+                
     def append_empty(self, repeat=None):
         if repeat is None: 
             self.repeat_indices.append(0)

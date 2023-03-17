@@ -185,7 +185,9 @@ for i in tqdm(range(N)):
             #BT.print_bassline_unique()
             print(BT.artist,':', BT.name)
             for i in range(len(BT.A)):
-                tokenized_inputs.append(BassTokens(BT.G[i], BT.D[i], BT.A[i], BT.E[i], BT.name, BT.artist, genre='Rock'))
+                token = BassTokens(BT.G[i], BT.D[i], BT.A[i], BT.E[i], BT.name, BT.artist, genre='Rock')
+                token.vectorize()
+                tokenized_inputs.append(token)
             
             
 #%% save the tokens
