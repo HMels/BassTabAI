@@ -9,17 +9,68 @@ import numpy as np
 
 class BassTokens:
     def __init__(self, G,D,A,E, name="", artist="",genre=""):
+        '''
+        Class to represent a tablature for bass guitar in tokenized form.
+        
+        Parameters
+        ----------
+        G : list
+            A list containing strings representing the notes on the G string of the bass guitar.
+        D : list
+            A list containing strings representing the notes on the D string of the bass guitar.
+        A : list
+            A list containing strings representing the notes on the A string of the bass guitar.
+        E : list
+            A list containing strings representing the notes on the E string of the bass guitar.
+        name : str, optional
+            The name of the song. Defaults to an empty string.
+        artist : str, optional
+            The name of the artist. Defaults to an empty string.
+        genre : str, optional
+            The genre of the song. Defaults to an empty string.
+    
+        Raises
+        ------
+        ValueError
+            If the length of `G`, `D`, `A`, and `E` lists are not equal.
+    
+        Returns
+        -------
+        None.
+        
+        '''
         self.name=name if name is not None else ""
         self.artist=artist if artist is not None else ""
         self.genre=genre if genre is not None else ""
         self.generate_dicts()
         self.vectorized=False
         
-        if len(G)!=len(D) and len(G)!=len(A) and len(G)!=len(E): raise ValueError("Objects [G,D,A,E] do not have equal length!")
+        if len(G)!=len(D) and len(G)!=len(A) and len(G)!=len(E): 
+            raise ValueError("Objects [G,D,A,E] do not have equal length!")
         self.tokens = self.tokenize_bar(G, D, A, E )
             
     
     def tokenize_bar(self, G, D, A, E):
+        """
+        Tokenizes a bar of guitar tablature and returns the count of each fret for each string.
+    
+        Parameters
+        ----------
+        G : str
+            The string representing the notes on the 3rd string of the guitar.
+        D : str
+            The string representing the notes on the 2nd string of the guitar.
+        A : str
+            The string representing the notes on the 4th string of the guitar.
+        E : str
+            The string representing the notes on the 1st string of the guitar.
+    
+        Returns
+        -------
+        bar_counts : list
+            A list containing the count of each fret for each string in the given order [E, A, D, G].
+    
+        """
         strings = [E, A, D, G]
         bar_counts = []
         bar_len = len(G)
@@ -106,6 +157,7 @@ class BassTokens:
     
     
     def print_detokenize(self):
+        # print the tab
         G,D,A,E = self.detokenize()
         for i in range(len(A)):
             print("G"+G[i])
@@ -115,8 +167,21 @@ class BassTokens:
         
         
     def detokenize(self):
+        """
+        Convert the tokenized fretboard back into a string representation.
+    
+        Returns
+        -------
+        G : str
+            A string representing the sixth string of the fretboard.
+        D : str
+            A string representing the fourth string of the fretboard.
+        A : str
+            A string representing the third string of the fretboard.
+        E : str
+            A string representing the first string of the fretboard.
+        """
         if self.vectorized: self.devectorize() # make sure the tokens are devectorized before tokenizing
-            
         G = ""
         D = ""
         A = ""
@@ -169,6 +234,34 @@ class BassTokens:
     
     
     def correct_special(self, note_1, special, note_2):
+        '''
+        Returns the corrected special character based on the given notes and special character.
+    
+        Parameters
+        ----------
+        note_1 : str
+            The first note in the pair.
+        special : str
+            The special character to be corrected.
+        note_2 : str
+            The second note in the pair.
+    
+        Returns
+        -------
+        int
+            The corrected special character, represented as an integer according to the self.dict_special dictionary.
+    
+        Raises
+        ------
+        None
+    
+        Notes
+        -----
+        - If the special character is one of '/', '\', 's', or 'S', then the function will correct it based on the values of note_1 and note_2.
+        - If the special character is one of 'h', 'H', 'p', or 'P', then the function will correct it based on the relative position of note_1 and note_2.
+        - If the special character is not one of the above, the function returns 0.
+    
+        '''
         if special in '/\\sS':
             if note_1.isdigit() and note_2.isdigit():
                 if int(note_1) > int(note_2):
@@ -185,6 +278,14 @@ class BassTokens:
         
         
     def vectorize(self):
+        '''
+        Converts the chord chart into a binary matrix representation.
+
+        Returns
+        -------
+        None.
+
+        '''
         self.Nfrets = len(self.invdict_frets)
         self.Nspecial = len(self.invdict_special)
         self.Nstrings = len(self.tokens[0]) -1
@@ -222,6 +323,13 @@ class BassTokens:
                 
         
     def devectorize(self):
+        '''
+        Convert a vectorized representation of a guitar tab to its original list of lists form.
+        
+        Returns
+        -------
+        None.
+        '''
         original_list = [[0]*(self.Nstrings+1) for _ in range(self.Nnotes)]
             
         for i in range(self.Nnotes):
@@ -248,6 +356,14 @@ class BassTokens:
         
 
     def generate_dicts(self):
+        '''
+        Creates dictionaries and lists to map between tokens and their 
+        corresponding frets, special characters, and dead notes.
+    
+        Returns
+        -------
+        None.
+        '''
         self.dict_frets = {
             '-': 0,
             '0': 1,
