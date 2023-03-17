@@ -4,15 +4,17 @@ Created on Wed Mar 15 12:30:20 2023
 
 @author: Mels
 """
+#import tensorflow as tf
 
-class Embeddings:
-    def __init__(self, bassTabs):
-        self.name=bassTabs.name if bassTabs.name is not None else ""
-        self.artist=bassTabs.artist if bassTabs.artist is not None else ""
+class BassTokens:
+    def __init__(self, G,D,A,E, name="", artist="",genre=""):
+        self.name=name if name is not None else ""
+        self.artist=artist if artist is not None else ""
+        self.genre=genre if genre is not None else ""
         self.generate_dicts()
-        self.token = []
-        for i in range(len(bassTabs.A)):
-            self.token.append( self.tokenize_bar(bassTabs.G[i], bassTabs.D[i], bassTabs.A[i], bassTabs.E[i] ) )
+        
+        if len(G)!=len(D) and len(G)!=len(A) and len(G)!=len(E): raise ValueError("Objects [G,D,A,E] do not have equal length!")
+        self.token = self.tokenize_bar(G, D, A, E )
             
     
     def tokenize_bar(self, G, D, A, E):
@@ -26,6 +28,7 @@ class Embeddings:
             doubledigits = False
             containsspecial = False
             ghostnote = False
+            #skipsave = False
             
             for j in range(4):
                 # double digits smaller than 20
@@ -65,9 +68,10 @@ class Embeddings:
                         
                 # bars 
                 elif strings[j][i] in "|":
+                    #skipsave=True # do not save the bars
                     count[j] = self.dict_frets["|"]
                     
-                
+            #if not skipsave:
             bar_counts.append(count)
             
             # double digits and special character means an extra count needs to be skipped
@@ -87,25 +91,14 @@ class Embeddings:
             print("A"+A[i])
             print("E"+E[i],'\n')   
         
-    
-    
+        
     def detokenize(self):
-        G,D,A,E=[],[],[],[]
-        for i in range(len(self.token)):
-            G1,D1,A1,E1=self.detokenize_bar(self.token[i])
-            G.append(G1)
-            D.append(D1)
-            A.append(A1)
-            E.append(E1)
-        return G,D,A,E
-    
-    def detokenize_bar(self, bar_counts):
         G = ""
         D = ""
         A = ""
         E = ""
         
-        for count in bar_counts:
+        for count in self.token:
             if ( len(self.invdict_frets[count[0]])==2 or len(self.invdict_frets[count[1]])==2
                 or len(self.invdict_frets[count[2]])==2 or len(self.invdict_frets[count[3]])==2): dash="--"
             else: dash="-"
@@ -195,6 +188,7 @@ class Embeddings:
             '\\':1,
             '/':1,
             's':1,
+            'S':1,
             'h':2,
             'H':2,
             'P':3,

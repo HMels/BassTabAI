@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import json
 
 from bassTab import BassTab, parse_tab_line
-from embeddings import Embeddings
+from bassTokens import BassTokens
 
 def load_bassTab(url):
     '''
@@ -184,7 +184,8 @@ for i in tqdm(range(N)):
         if BT is not None:
             #BT.print_bassline_unique()
             print(BT.artist,':', BT.name)
-            tokenized_inputs.append(Embeddings(BT))
+            for i in range(len(BT.A)):
+                tokenized_inputs.append(BassTokens(BT.G[i], BT.D[i], BT.A[i], BT.E[i], BT.name, BT.artist, genre='Rock'))
             
             
 #%% save the tokens
@@ -194,8 +195,78 @@ import pickle
 # Save the list using Pickle
 with open('tokenized_inputs.pickle', 'wb') as f:
     pickle.dump(tokenized_inputs, f)
+    
+    
+'''
+#%% show the average length of a bar as token
+bar_lens = []
+for tokens in tokenized_inputs:
+    token = tokens.token
+    for t in token:
+        bar_lens.append(len(t))
+        
+import matplotlib.pyplot as plt
+
+hist = plt.hist(bar_lens, bins=len(bar_lens))
+plt.xlabel('Bar Length')
+plt.ylabel('Frequency')
+plt.title('Histogram')
+
+plt.show()
+
+#%% analyse the common denominator
+import matplotlib.pyplot as plt
+
+Denom = range(4,80)
+Denom2 = []
+Counter2 = []
+Denom3 = []
+Counter3 = []
+Denom0 = []
+Counter0 = []
+Denom1 = []
+Counter1 = []
+dens_345 = 0
+dens_overig = 0
+for denom in Denom:
+    counter=0
+    for num in bar_lens:
+        if num % denom ==0:
+            counter+=1
+    
+    if denom % 4 ==0:
+        Denom1.append(4)
+        Counter1.append(counter)
+        dens_345+counter
+    if denom % 3==0:
+        Denom0.append(3)
+        Counter0.append(counter)
+        dens_345+counter
+    if denom % 5==0:
+        Denom3.append(5)
+        Counter3.append(counter)
+        dens_345+=counter
+    if denom%3!=0 and denom%4!=0 and denom%5!=0: 
+        Denom2.append(denom)
+        Counter2.append(counter)
+        dens_overig+=counter
 
 
+# Create a histogram of the frequencies
+plt.bar(Denom2, Counter2, label="rest")
+plt.bar(Denom0, Counter0, label='dev3')
+plt.bar(Denom1, Counter1, label='dev4')
+plt.bar(Denom3, Counter3, label='dev5')
+plt.xlabel('Common Denominator')
+plt.ylabel('Frequency')
+plt.title('Frequency of Common Denominators')
+plt.legend()
+plt.show()
+
+print("Right now the common denominators of 3, 4 and 5 result in",dens_345,'cases being saved.',dens_overig,'cases are thrown away!')
+
+
+'''
 #%%
 # Load the list back from the Pickle file
 #with open('tokenized_inputs.pickle', 'rb') as f:
