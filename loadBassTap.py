@@ -183,6 +183,7 @@ for i in tqdm(range(N)):
                 token.vectorize()
                 tokenized_inputs.append(token)
             
+                            
             
 #%% save the tokens
 import pickle
@@ -200,4 +201,4 @@ with open('tokenized_inputs.pickle', 'rb') as f:
     
 #%%
 vocab_size=len(tokenized_inputs[0].dict_frets)*4 + len(tokenized_inputs[0].dict_special)
-skipgram(tokenized_inputs, vocab_size=vocab_size, embedding_size=vocab_size, window_size=16)
+Embeddings = skipgram([tokenized_inputs[25]], vocab_size=vocab_size, embedding_size=vocab_size, window_size=16)

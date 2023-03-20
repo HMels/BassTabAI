@@ -50,6 +50,7 @@ class BassTokens:
         self.tokens = self.tokenize_bar(G, D, A, E )
             
     
+    
     def tokenize_bar(self, G, D, A, E):
         """
         Tokenizes a bar of guitar tablature and returns the count of each fret for each string.
@@ -159,11 +160,11 @@ class BassTokens:
     def print_detokenize(self):
         # print the tab
         G,D,A,E = self.detokenize()
-        for i in range(len(A)):
-            print("G"+G[i])
-            print("D"+D[i])
-            print("A"+A[i])
-            print("E"+E[i],'\n')   
+        #for i in range(len(A)):
+        print("G"+G)
+        print("D"+D)
+        print("A"+A)
+        print("E"+E,'\n')   
         
         
     def detokenize(self):
@@ -296,21 +297,21 @@ class BassTokens:
         vectorized_list = np.zeros([self.Nnotes, self.Ndim], dtype=np.int32)
         
         # the vector will have the next translations: 
-            # [0,0,0,...,0,0] -> '-'
-            # [0,1,0,...,0,0] -> '|'
-            # [0,0,x,...,0,0] -> notes from the fret dictionary. This goes from index 2 to Nstrings*(Nfrets-2)+2
-            # [0,0,...,x,0,0] -> notes from the special dictionary, This goes from index Nstrings*(Nfrets-2)+2 to the end
+            # [0,0,...,0,0] -> '-'
+            # [1,0,...,0,0] -> '|'
+            # [0,x,...,0,0] -> notes from the fret dictionary. This goes from index 2 to Nstrings*(Nfrets-2)+2
+            # [0,...,x,0,0] -> notes from the special dictionary, This goes from index Nstrings*(Nfrets-2)+2 to the end
         for i in range(self.Nnotes):
             for j in range(self.Nstrings):
                 #TODO maybe [0,0,0,...,0,0] -> '-' should be changed to [1,0,0,...,0,0] -> '-'
                 
                 # the bar sign
                 if self.tokens[i][j]==self.dict_frets['|']:
-                    vectorized_list[i,1]=1
+                    vectorized_list[i,0]=1
                     
                 # the notes from the fret dictionary
                 elif self.tokens[i][j]!=0:
-                    index_j = 1 + j*(self.Nfrets-2) + self.tokens[i][j]
+                    index_j = j*(self.Nfrets-2) + self.tokens[i][j]
                     vectorized_list[i,index_j]=1
             
             # special characters
@@ -335,12 +336,12 @@ class BassTokens:
         for i in range(self.Nnotes):
             for j in range(self.Nstrings):
                 # the bar sign
-                if self.tokens[i,1] == 1:
+                if self.tokens[i,0] == 1:
                     original_list[i][j] = self.dict_frets['|']
                     
                 # the notes from the fret dictionary
                 else:
-                    index_j = 1 + j*(self.Nfrets-2)
+                    index_j = j*(self.Nfrets-2)
                     note_index = np.where(self.tokens[i, index_j+1:index_j+self.Nfrets-1] == 1)[0]
                     if len(note_index)!=0:
                         original_list[i][j] = int(note_index)+1 #if note_index != self.Nfrets-1 else 0 # if note is '-'
