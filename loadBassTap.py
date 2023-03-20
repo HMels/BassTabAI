@@ -200,5 +200,13 @@ with open('tokenized_inputs.pickle', 'rb') as f:
     tokenized_inputs = pickle.load(f)
     
 #%%
-vocab_size=len(tokenized_inputs[0].dict_frets)*4 + len(tokenized_inputs[0].dict_special)
-Embeddings = skipgram([tokenized_inputs[25]], vocab_size=vocab_size, embedding_size=vocab_size, window_size=16)
+vocab_size=(len(tokenized_inputs[0].dict_frets)-3)*4 + len(tokenized_inputs[0].dict_special)
+Embeddings = skipgram(tokenized_inputs, vocab_size=vocab_size, embedding_size=vocab_size, window_size=4)
+
+#%%
+import numpy as np
+
+np.save('Embeddings.npy', Embeddings)
+
+#%%
+Embeddings = np.load('Embeddings.npy')

@@ -19,7 +19,7 @@ class SkipGramModel(tf.keras.Model):
         output = self.dense_layer(embedding)
         return output
 
-def skipgram(Tokens, vocab_size, embedding_size, window_size=16, learning_rate=0.01, epochs=10, batch_size=128):
+def skipgram(Tokens, vocab_size, embedding_size, window_size=4, learning_rate=0.01, epochs=10, batch_size=128):
     """
     Trains a Skip-gram Word2Vec model on a list of tensors.
 
@@ -27,7 +27,7 @@ def skipgram(Tokens, vocab_size, embedding_size, window_size=16, learning_rate=0
         Tokens (bassTokens list): A list of bassTokens. 
         vocab_size (int): The size of the vocabulary to use.
         embedding_size (int): The size of the embedding vectors.
-        window_size (int): The size of the window to use for context words (default 2).
+        window_size (int): The size of the window to use for the notes (default 4).
         learning_rate (float): The learning rate to use for optimization (default 0.01).
         epochs (int): The number of epochs to train for (default 10).
         batch_size (int): The batch size to use for training (default 128).
@@ -35,6 +35,8 @@ def skipgram(Tokens, vocab_size, embedding_size, window_size=16, learning_rate=0
     Returns:
         A numpy array of shape (vocab_size, embedding_size) containing the word embeddings.
     """
+    
+    
     '''
     # Flatten the tensors and create a vocabulary
     tensors=[]
@@ -78,7 +80,9 @@ def skipgram(Tokens, vocab_size, embedding_size, window_size=16, learning_rate=0
     # context words based on a sliding window approach.
     target_words = []
     context_words = []
+    step=0
     for Token in Tokens:
+        print("Creating Embedding - step:",step+'/'+len(Tokens))
         Nnotes = Token.tokens.shape[1] - Token.Nspecial
         
         # delete the rows with only zeros or with a one in the first column
