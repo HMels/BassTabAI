@@ -4,7 +4,7 @@ Created on Wed Mar 15 12:30:20 2023
 
 @author: Mels
 """
-#import tensorflow as tf
+import tensorflow as tf
 import numpy as np
 
 class BassTokens:
@@ -293,7 +293,7 @@ class BassTokens:
         self.Nnotes = len(self.tokens)
         
         # we calculate the dimensions we need, In this case, no vector is a dash '-'
-        self.Ndim = 2 + self.Nstrings*(self.Nfrets-2) + self.Nspecial
+        self.Ndim = 1 + self.Nstrings*(self.Nfrets-2) + self.Nspecial
         vectorized_list = np.zeros([self.Nnotes, self.Ndim], dtype=np.int32)
         
         # the vector will have the next translations: 
@@ -354,6 +354,21 @@ class BassTokens:
         self.tokens=original_list
         self.vectorized=False
         #return original_list
+        
+    
+    def note2index(self, vector):
+        return tf.where(vector[:-self.Nspecial])
+    
+    def special2index(self, vector):
+        return tf.where(vector[-self.Nspecial:]) +  self.Ndim - self.Nspecial
+    
+    def vector2index(self, vector):
+        return tf.where(vector)
+    
+    def index2vector(self, notes):
+        vector = np.zeros(self.Ndim, dtype=np.int32)
+        vector[np.array(notes)]=1
+        return tf.Variable(vector)
         
 
     def generate_dicts(self):

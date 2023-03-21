@@ -82,8 +82,8 @@ def skipgram(Tokens, vocab_size, embedding_size, window_size=4, learning_rate=0.
     context_words = []
     step=0
     for Token in Tokens:
-        print("Creating Embedding - step:",step+'/'+len(Tokens))
-        Nnotes = Token.tokens.shape[1] - Token.Nspecial
+        if step%10==0: print("Creating Embedding - step:",str(step)+'/'+str(len(Tokens)))
+        step+=1
         
         # delete the rows with only zeros or with a one in the first column
         flattened = tf.boolean_mask(Token.tokens, tf.math.reduce_sum(Token.tokens,axis=1)!= 0)
@@ -91,8 +91,8 @@ def skipgram(Tokens, vocab_size, embedding_size, window_size=4, learning_rate=0.
         for i, target_token in enumerate(flattened):
 
             # loop over the special notes and add them
-            notes_i = tf.where(target_token[:Nnotes])
-            notes_special = tf.where(target_token[Nnotes:])+Nnotes
+            notes_i = Token.note2index(target_token)
+            notes_special = Token.special2index(target_token)
             if len(notes_special)!=0:
                 for note_i in notes_i:
                     for special in notes_special:
@@ -104,7 +104,7 @@ def skipgram(Tokens, vocab_size, embedding_size, window_size=4, learning_rate=0.
             end = min(len(flattened), i + window_size + 1)
             for j in range(start, end):
                 if j != i:
-                    notes_j = tf.where(flattened[j,:Nnotes])
+                    notes_j = Token.note2index(flattened[j,:])
                     for note_i in notes_i:
                         for note_j in notes_j:
                             target_words.append(note_i.numpy()[0])
