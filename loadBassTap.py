@@ -4,7 +4,7 @@ import json
 
 from bassTab import BassTab, parse_tab_line
 from bassTokens import BassTokens
-from Tab2Vec import skipgram, SkipGramModel
+from Tab2Vec import skipgram
 
 def load_bassTab(url):
     '''
@@ -194,20 +194,17 @@ with open('tokenized_inputs.pickle', 'wb') as f:
     pickle.dump(tokenized_inputs, f)
     
   
-#%%
+#%% create embeddings
+import numpy as np
+import pickle
+
 # Load the list back from the Pickle file
 with open('tokenized_inputs.pickle', 'rb') as f:
     tokenized_inputs = pickle.load(f)
     
-#%%
 vocab_size=(len(tokenized_inputs[0].invdict_frets)-2)*4 + len(tokenized_inputs[0].invdict_special)+1
 Embeddings_weights = skipgram(tokenized_inputs, vocab_size=vocab_size, embedding_size=vocab_size, window_size=4)
 
-#%%
-import numpy as np
 
 np.save('Embeddings.npy', Embeddings_weights)
-
-#%%
-Embeddings_weights = np.load('Embeddings.npy')
 
