@@ -4,8 +4,7 @@ import json
 
 from bassTab import BassTab, parse_tab_line
 from basslineLibrary import BasslineLibrary
-#from bassTokens import BassTokens
-from automaticBassToken import BassTokens
+from bassTokens import BassTokens
 from Tab2Vec import skipgram
 
 def load_bassTab(url):
@@ -181,8 +180,8 @@ for i in tqdm(range(N)):
             #BT.print_bassline_unique()
             print(BT.artist,':', BT.name)
             for i in range(len(BT.A)):
-                token = BassTokens(BT.G[i], BT.D[i], BT.A[i], BT.E[i], BT.name, BT.artist, genre='Rock')
-                BasslineLibrary.add_tokens(token)
+                tokens = BassTokens(BT.G[i], BT.D[i], BT.A[i], BT.E[i], BT.name, BT.artist, genre='Rock')
+                BasslineLibrary.add_tokens(tokens)
             
                             
             
@@ -191,22 +190,22 @@ import pickle
 
 # Assuming your tokenized inputs are stored in a list called 'tokenized_inputs'
 # Save the list using Pickle
-with open('tokenized_inputs.pickle', 'wb') as f:
+with open('BasslineLibrary.pickle', 'wb') as f:
     pickle.dump(BasslineLibrary, f)
     
-
+## TODO Should special moves be coupled to eachother
 
 #%% create embeddings
 import numpy as np
 import pickle
 
 # Load the list back from the Pickle file
-with open('tokenized_inputs.pickle', 'rb') as f:
+with open('BasslineLibrary.pickle', 'rb') as f:
     BasslineLibrary = pickle.load(f)
     
 embedding_size = (21+3)*4 + 9 # 21 frets (incl zeroth), 3 special notes (dead, none and bar) and 9 special moves
 Embeddings_weights = skipgram(BasslineLibrary.Data, vocab_size=len(BasslineLibrary.library),
-                              embedding_size=embedding_size, window_size=4)
+                              embedding_size=embedding_size, window_size=8)
 
 
 np.save('Embeddings.npy', Embeddings_weights)

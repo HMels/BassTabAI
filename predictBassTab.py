@@ -9,17 +9,13 @@ import tensorflow as tf
 import numpy as np
 
 #from Tab2Vec import SkipGramModel
-
-class MyModel(tf.keras.Model):
-    def __init__(self, embedding_weights, output_sequence):
-        super(MyModel, self).__init__()
-        self.output_sequence = output_sequence
-        #expanded_weights = tf.tile(tf.expand_dims(embedding_weights, axis=0), [4, embedding_weights.shape[0], embedding_weights.shape[1]])
+class PredictBassTab(tf.keras.Model):
+    def __init__(self, embedding_weights):
+        super(PredictBassTab, self).__init__()
         self.embedding_layer = tf.keras.layers.Embedding(
             input_dim=embedding_weights.shape[0], 
             output_dim=embedding_weights.shape[1], 
             weights=[embedding_weights], 
-            #input_length=input_sequence,
             trainable=False,
             name='embedding'
         )
@@ -28,7 +24,7 @@ class MyModel(tf.keras.Model):
         self.dropout_layer1 = tf.keras.layers.Dropout(0.5)
         self.dense_layer2 = tf.keras.layers.Dense(128, activation='relu')
         self.dropout_layer2 = tf.keras.layers.Dropout(0.5)
-        self.output_layer = tf.keras.layers.Dense(output_sequence, activation='softmax')
+        self.output_layer = tf.keras.layers.Dense(128, activation='softmax')
 
     def call(self, inputs):
         embedding = self.embedding_layer(inputs)
@@ -39,42 +35,9 @@ class MyModel(tf.keras.Model):
         dropout2 = self.dropout_layer2(dense2)
         output = self.output_layer(dropout2)
         return output
-    
-
-class MyModel1(tf.keras.Model):
-    def __init__(self, embedding_weights, output_sequence=None):
-        super(MyModel1, self).__init__()
-        self.output_sequence = output_sequence
-        self.embedding_layer = tf.keras.layers.Embedding(
-            input_dim=embedding_weights.shape[0], 
-            output_dim=embedding_weights.shape[1], 
-            weights=[embedding_weights], 
-            trainable=False,
-            name='embedding'
-        )
-        self.flatten_layer = tf.keras.layers.Flatten()
-        self.dense_layer1 = tf.keras.layers.Dense(256, activation='relu')
-        self.dropout_layer1 = tf.keras.layers.Dropout(0.5)
-        self.dense_layer2 = tf.keras.layers.Dense(128, activation='relu')
-        self.dropout_layer2 = tf.keras.layers.Dropout(0.5)
-        self.output_layer = tf.keras.layers.Dense(units=output_sequence, activation='softmax', name='output')
-
-    def call(self, inputs, output_sequence=None):
-        embedding = self.embedding_layer(inputs)
-        flattened = self.flatten_layer(embedding)
-        dense1 = self.dense_layer1(flattened)
-        dropout1 = self.dropout_layer1(dense1)
-        dense2 = self.dense_layer2(dropout1)
-        dropout2 = self.dropout_layer2(dense2)
-        if output_sequence is None:
-            output_sequence = self.output_sequence
-        output = self.output_layer(dropout2)
-        if output_sequence is not None:
-            output = tf.reshape(output, (-1, output_sequence, output.shape[-1]))
-        return output
 
 
-def train_model(Tokens, embedding_weights, sequence_length_output=1, epochs=10, batch_size=128, learning_rate=0.001):
+def train_model(Tokens, embedding_weights, epochs=10, batch_size=128, learning_rate=0.001):
     """
     Trains a neural network using the pre-trained word embeddings on a list of tokenized inputs and targets.
 
@@ -84,8 +47,7 @@ def train_model(Tokens, embedding_weights, sequence_length_output=1, epochs=10, 
         embedding_weights (numpy array): A numpy array of shape (vocab_size, embedding_size) containing the pre-trained word embeddings.
         vocab_size (int): The size of the vocabulary to use.
         embedding_size (int): The size of the embedding vectors.
-        sequence_length_input (int): The number of tokens to use as input (default 4).
-        sequence_length_output (int): The number of tokens to predict (default 1).
+        output_sequence (int): The number of tokens to predict (default None).
         epochs (int): The number of epochs to train for (default 10).
         batch_size (int): The batch size to use for training (default 128).
         learning_rate (float): The learning rate to use for optimization (default 0.001).
@@ -94,7 +56,7 @@ def train_model(Tokens, embedding_weights, sequence_length_output=1, epochs=10, 
         A trained TensorFlow model.
     """
     # Initialize the model and loss function.
-    model = MyModel(embedding_weights, 128)
+    model = PredictBassTab(embedding_weights)
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
     # Prepare the training dataset.
@@ -128,32 +90,35 @@ def train_model(Tokens, embedding_weights, sequence_length_output=1, epochs=10, 
 
 #%% loading model
 # Load the list from the Pickle file
-with open('tokenized_inputs.pickle', 'rb') as f:
+with open('BasslineLibrary.pickle', 'rb') as f:
     BasslineLibrary = pickle.load(f)
 
 # Load the pre-trained embeddings
 embedding_weights = np.load('Embeddings.npy')
 
 # Train the model.
-model = train_model(BasslineLibrary.Data, embedding_weights, sequence_length_output=1)
+model = train_model(BasslineLibrary.Data, embedding_weights)
+
+#%% save model
+tf.keras.models.save_model(model, 'PredictBassTab')
 
 
-## TODO fix the count, make sure there is a bar every 8th? count?
-## TODO add pauzes
+#%% load model
+loaded_model = tf.keras.models.load_model('PredictBassTab')
 
 #%% Testing
-i = 188
+i = 108
 input_data = BasslineLibrary.Data[i]
+index_bar1 = np.where(input_data==0)[0][1]
 
 # Use the trained model to make predictions.
-test_input = tf.boolean_mask(input_data, input_data!=1) #[0,2,2,]  # a tokenized input to predict
-test_input = np.array(test_input[:int(len(test_input)/2)+1])
+test_input = np.array(input_data.numpy()[:index_bar1])#[:int(input_data.shape[0]/2)+1])
 output = model.predict(test_input)
 
 prediction = tf.argmax(output, axis=1, output_type=tf.int32).numpy()
 
 print("Input first half of",BasslineLibrary.names[i]+':')
-BasslineLibrary.print_detokenize(tf.boolean_mask(input_data, input_data!=1))
+BasslineLibrary.print_detokenize(input_data)
 
-print("Output")
+print("Generated by the model")
 BasslineLibrary.print_detokenize(np.concatenate([test_input,prediction]))
