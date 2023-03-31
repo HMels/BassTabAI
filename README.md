@@ -7,8 +7,7 @@ Right now the architecture of the program is the following:
 	1.1 The file loadBassTab.py uses the function load_bassTab() to load bass tabs from the internet. It loads it into the BassTab class to get it into the right format (reading the basslines of the internet is a bit messy). It also uses the function parse_tab_line() from bassTab.py to load basslines till the end of the line.
 	
 	1.2 It will then create a BassTokens, which is a class from the file with the same name. This class is able to correctly split the basstab into tokens, by checking the surrounding notes. 
-	
-		It is able to store them into the next format [E,A,D,G,S] which are the 4 strings and then the special move (hammer ons, slides, pull-offs, bends, and more). This is done via a dictionary.
+	It is able to store them into the next format [E,A,D,G,S] which are the 4 strings and then the special move (hammer ons, slides, pull-offs, bends, and more). This is done via a dictionary.
 		
 	1.3 Then it adds the tokens to an overarching class called BasslineLibrary. This class generates a library of all tokens it gets as input, and will store the basslines as references to elemens in that library. It also stores misc information such as song name, artist and genre.
 	
