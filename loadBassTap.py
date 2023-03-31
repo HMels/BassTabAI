@@ -3,7 +3,9 @@ from bs4 import BeautifulSoup
 import json
 
 from bassTab import BassTab, parse_tab_line
-from bassTokens import BassTokens
+from basslineLibrary import BasslineLibrary
+#from bassTokens import BassTokens
+from automaticBassToken import BassTokens
 from Tab2Vec import skipgram
 
 def load_bassTab(url):
@@ -156,7 +158,7 @@ url2 = "&tuning[]=1&type[]=Bass%20Tabs"
 N = 1 # total number of pages to scrape, 100 is maximum
 
 # List to store all the bassTab objects
-tokenized_inputs = []
+BasslineLibrary = BasslineLibrary()
 
 for i in tqdm(range(N)):
     url = url1+str(i)+url2
@@ -180,8 +182,7 @@ for i in tqdm(range(N)):
             print(BT.artist,':', BT.name)
             for i in range(len(BT.A)):
                 token = BassTokens(BT.G[i], BT.D[i], BT.A[i], BT.E[i], BT.name, BT.artist, genre='Rock')
-                token.vectorize()
-                tokenized_inputs.append(token)
+                BasslineLibrary.add_tokens(token)
             
                             
             
@@ -191,19 +192,21 @@ import pickle
 # Assuming your tokenized inputs are stored in a list called 'tokenized_inputs'
 # Save the list using Pickle
 with open('tokenized_inputs.pickle', 'wb') as f:
-    pickle.dump(tokenized_inputs, f)
+    pickle.dump(BasslineLibrary, f)
     
-  
+
+
 #%% create embeddings
 import numpy as np
 import pickle
 
 # Load the list back from the Pickle file
 with open('tokenized_inputs.pickle', 'rb') as f:
-    tokenized_inputs = pickle.load(f)
+    BasslineLibrary = pickle.load(f)
     
-vocab_size=(len(tokenized_inputs[0].invdict_frets)-2)*4 + len(tokenized_inputs[0].invdict_special)+1
-Embeddings_weights = skipgram(tokenized_inputs, vocab_size=vocab_size, embedding_size=vocab_size, window_size=4)
+embedding_size = (21+3)*4 + 9 # 21 frets (incl zeroth), 3 special notes (dead, none and bar) and 9 special moves
+Embeddings_weights = skipgram(BasslineLibrary.Data, vocab_size=len(BasslineLibrary.library),
+                              embedding_size=embedding_size, window_size=4)
 
 
 np.save('Embeddings.npy', Embeddings_weights)
