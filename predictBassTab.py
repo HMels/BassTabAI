@@ -18,7 +18,7 @@ class MyModel(tf.keras.Model):
         self.embedding_layer = tf.keras.layers.Embedding(
             input_dim=embedding_weights.shape[0], 
             output_dim=embedding_weights.shape[1], 
-            weights=embedding_weights, 
+            weights=[embedding_weights], 
             #input_length=input_sequence,
             trainable=False,
             name='embedding'
@@ -39,32 +39,42 @@ class MyModel(tf.keras.Model):
         dropout2 = self.dropout_layer2(dense2)
         output = self.output_layer(dropout2)
         return output
-'''
+    
 
-
-class MyModel(tf.keras.Model):
-    def __init__(self, output_sequence):
-        super(MyModel, self).__init__()
+class MyModel1(tf.keras.Model):
+    def __init__(self, embedding_weights, output_sequence=None):
+        super(MyModel1, self).__init__()
+        self.output_sequence = output_sequence
+        self.embedding_layer = tf.keras.layers.Embedding(
+            input_dim=embedding_weights.shape[0], 
+            output_dim=embedding_weights.shape[1], 
+            weights=[embedding_weights], 
+            trainable=False,
+            name='embedding'
+        )
         self.flatten_layer = tf.keras.layers.Flatten()
         self.dense_layer1 = tf.keras.layers.Dense(256, activation='relu')
         self.dropout_layer1 = tf.keras.layers.Dropout(0.5)
         self.dense_layer2 = tf.keras.layers.Dense(128, activation='relu')
         self.dropout_layer2 = tf.keras.layers.Dropout(0.5)
-        self.lstm_layer = tf.keras.layers.LSTM(units=64, return_sequences=True)
-        self.output_layer = tf.keras.layers.Dense(units=output_sequence, activation='softmax')
+        self.output_layer = tf.keras.layers.Dense(units=output_sequence, activation='softmax', name='output')
 
-    def call(self, inputs):
-        flattened = self.flatten_layer(inputs)
+    def call(self, inputs, output_sequence=None):
+        embedding = self.embedding_layer(inputs)
+        flattened = self.flatten_layer(embedding)
         dense1 = self.dense_layer1(flattened)
         dropout1 = self.dropout_layer1(dense1)
         dense2 = self.dense_layer2(dropout1)
         dropout2 = self.dropout_layer2(dense2)
-        lstm = self.lstm_layer(dropout2)
-        output = self.output_layer(lstm)
+        if output_sequence is None:
+            output_sequence = self.output_sequence
+        output = self.output_layer(dropout2)
+        if output_sequence is not None:
+            output = tf.reshape(output, (-1, output_sequence, output.shape[-1]))
         return output
-'''
 
-def train_model(Tokens, embedding_weights, sequence_length_input=1, sequence_length_output=1, epochs=10, batch_size=128, learning_rate=0.001):
+
+def train_model(Tokens, embedding_weights, sequence_length_output=1, epochs=10, batch_size=128, learning_rate=0.001):
     """
     Trains a neural network using the pre-trained word embeddings on a list of tokenized inputs and targets.
 
@@ -86,17 +96,15 @@ def train_model(Tokens, embedding_weights, sequence_length_input=1, sequence_len
     # Initialize the model and loss function.
     model = MyModel(embedding_weights, 128)
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-    #loss_fn = tf.keras.losses.SparseCategoricalCrossentropy()
-
 
     # Prepare the training dataset.
     inputs_ = []
     targets_ = []
-    for Token in Tokens:
-        input_tokens = tf.boolean_mask(Token, Token!=1)
-        for i in range(sequence_length_input, input_tokens.shape[0] - sequence_length_output):
-            inputs_.append(input_tokens[i-sequence_length_input:i])
-            targets_.append(input_tokens[i:i+sequence_length_output])
+    for input_tokens in Tokens:
+        #input_tokens = tf.boolean_mask(Token, Token!=1)
+        for i in range(input_tokens.shape[0]):
+            inputs_.append(input_tokens[i])
+            targets_.append(input_tokens[i])
     inputs_ = np.array(inputs_)
     targets_ = np.array(targets_)
     dataset = tf.data.Dataset.from_tensor_slices((inputs_, targets_)).shuffle(buffer_size=len(inputs_)).batch(batch_size)
@@ -107,7 +115,6 @@ def train_model(Tokens, embedding_weights, sequence_length_input=1, sequence_len
         for input_batch, target_batch1 in dataset:
             with tf.GradientTape() as tape:
                 output = model(input_batch)
-                #output = output[:, -sequence_length_output:, :]
                 target_batch = tf.one_hot(tf.squeeze(target_batch1), depth=output.shape[1])
                 loss = tf.reduce_mean(tf.square(output - target_batch))#     tf.keras.losses.CategoricalCrossentropy(output, target_batch)  #           
     
@@ -128,9 +135,9 @@ with open('tokenized_inputs.pickle', 'rb') as f:
 embedding_weights = np.load('Embeddings.npy')
 
 # Train the model.
-model = train_model(BasslineLibrary.Data, embedding_weights, sequence_length_input=1, sequence_length_output=1)
+model = train_model(BasslineLibrary.Data, embedding_weights, sequence_length_output=1)
 
-## TODO fix embedding
+
 ## TODO fix the count, make sure there is a bar every 8th? count?
 ## TODO add pauzes
 
