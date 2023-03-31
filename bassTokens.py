@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Mar 15 12:30:20 2023
+Created on Wed Mar 29 18:10:02 2023
 
 @author: Mels
 """
-import tensorflow as tf
-import numpy as np
+import ast
 
 class BassTokens:
     def __init__(self, G,D,A,E, name="", artist="",genre=""):
@@ -43,13 +42,11 @@ class BassTokens:
         self.artist=artist if artist is not None else ""
         self.genre=genre if genre is not None else ""
         self.generate_dicts()
-        self.vectorized=False
         
         if len(G)!=len(D) and len(G)!=len(A) and len(G)!=len(E): 
             raise ValueError("Objects [G,D,A,E] do not have equal length!")
         self.tokens = self.tokenize_bar(G, D, A, E )
             
-    
     
     def tokenize_bar(self, G, D, A, E):
         """
@@ -146,7 +143,7 @@ class BassTokens:
                     count[j] = self.dict_frets["|"]
                     
             #if not skipsave:
-            bar_counts.append(count)
+            bar_counts.append(str(count))
             
             # double digits and special character means an extra count needs to be skipped
             i+=1
@@ -182,13 +179,14 @@ class BassTokens:
         E : str
             A string representing the first string of the fretboard.
         """
-        if self.vectorized: self.devectorize() # make sure the tokens are devectorized before tokenizing
         G = ""
         D = ""
         A = ""
         E = ""
         
-        for count in self.tokens:
+        for count_str in self.tokens:
+            count = ast.literal_eval(count_str) # transform the string to a list again
+            
             if ( len(self.invdict_frets[count[0]])==2 or len(self.invdict_frets[count[1]])==2
                 or len(self.invdict_frets[count[2]])==2 or len(self.invdict_frets[count[3]])==2): dash="--"
             else: dash="-"
@@ -278,99 +276,6 @@ class BassTokens:
             return 0
         
         
-    def vectorize(self):
-        '''
-        Converts the chord chart into a binary matrix representation.
-
-        Returns
-        -------
-        None.
-
-        '''
-        self.Nfrets = len(self.invdict_frets)
-        self.Nspecial = len(self.invdict_special)
-        self.Nstrings = len(self.tokens[0]) -1
-        self.Nnotes = len(self.tokens)
-        
-        # we calculate the dimensions we need, In this case, no vector is a dash '-'
-        self.Ndim = 1 + self.Nstrings*(self.Nfrets-2) + self.Nspecial
-        vectorized_list = np.zeros([self.Nnotes, self.Ndim], dtype=np.int32)
-        
-        # the vector will have the next translations: 
-            # [0,0,...,0,0] -> '-'
-            # [1,0,...,0,0] -> '|'
-            # [0,x,...,0,0] -> notes from the fret dictionary. This goes from index 2 to Nstrings*(Nfrets-2)+2
-            # [0,...,x,0,0] -> notes from the special dictionary, This goes from index Nstrings*(Nfrets-2)+2 to the end
-        for i in range(self.Nnotes):
-            for j in range(self.Nstrings):
-                #TODO maybe [0,0,0,...,0,0] -> '-' should be changed to [1,0,0,...,0,0] -> '-'
-                
-                # the bar sign
-                if self.tokens[i][j]==self.dict_frets['|']:
-                    vectorized_list[i,0]=1
-                    
-                # the notes from the fret dictionary
-                elif self.tokens[i][j]!=0:
-                    index_j = j*(self.Nfrets-2) + self.tokens[i][j]
-                    vectorized_list[i,index_j]=1
-            
-            # special characters
-            if self.tokens[i][-1]!=0:
-                index_j = self.Ndim - self.Nspecial + self.tokens[i][-1]
-                vectorized_list[i,index_j]=1
-                
-        self.vectorized=True
-        self.tokens=vectorized_list
-                
-        
-    def devectorize(self):
-        '''
-        Convert a vectorized representation of a guitar tab to its original list of lists form.
-        
-        Returns
-        -------
-        None.
-        '''
-        original_list = [[0]*(self.Nstrings+1) for _ in range(self.Nnotes)]
-            
-        for i in range(self.Nnotes):
-            for j in range(self.Nstrings):
-                # the bar sign
-                if self.tokens[i,0] == 1:
-                    original_list[i][j] = self.dict_frets['|']
-                    
-                # the notes from the fret dictionary
-                else:
-                    index_j = j*(self.Nfrets-2)
-                    note_index = np.where(self.tokens[i, index_j+1:index_j+self.Nfrets-1] == 1)[0]
-                    if len(note_index)!=0:
-                        original_list[i][j] = int(note_index)+1 #if note_index != self.Nfrets-1 else 0 # if note is '-'
-            
-            # special characters         
-            special_index=np.where(self.tokens[i,-self.Nspecial:] == 1)[0]
-            if len(special_index)!=0:
-                original_list[i][-1] = int(special_index)# if special_index != self.Nspecial else 0 # if special character is '-'
-        
-        self.tokens=original_list
-        self.vectorized=False
-        #return original_list
-        
-    
-    def note2index(self, vector):
-        return tf.where(vector[:-self.Nspecial])
-    
-    def special2index(self, vector):
-        return tf.where(vector[-self.Nspecial:]) +  self.Ndim - self.Nspecial
-    
-    def vector2index(self, vector):
-        return tf.where(vector)
-    
-    def index2vector(self, notes):
-        vector = np.zeros(self.Ndim, dtype=np.int32)
-        vector[np.array(notes)]=1
-        return tf.Variable(vector)
-        
-
     def generate_dicts(self):
         '''
         Creates dictionaries and lists to map between tokens and their 
