@@ -13,7 +13,7 @@ Right now the architecture of the program is the following:
 	
 	1.4 It then saves the library as BasslineLibrary.pickle
 
-2. Next, loadBassTab.py will crerate an Embeddings using the skip gram model found in Tab2Vec.
+2. Next, Tab2Vec.py will crerate an Embeddings using the skip gram model found in Tab2Vec.
 
 	2.1 The embeddings will be saved as Embeddings.npy
 

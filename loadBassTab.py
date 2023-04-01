@@ -5,7 +5,6 @@ import json
 from bassTab import BassTab, parse_tab_line
 from basslineLibrary import BasslineLibrary
 from bassTokens import BassTokens
-from Tab2Vec import skipgram
 
 def load_bassTab(url):
     '''
@@ -154,7 +153,7 @@ from tqdm import tqdm
 # filtered on best rating, bass tab, standard tuning and rock
 url1 = "https://www.ultimate-guitar.com/explore?genres[]=4&order=rating_desc&page="
 url2 = "&tuning[]=1&type[]=Bass%20Tabs"
-N = 1 # total number of pages to scrape, 100 is maximum
+N = 100 # total number of pages to scrape, 100 is maximum
 
 # List to store all the bassTab objects
 BasslineLibrary = BasslineLibrary()
@@ -195,18 +194,4 @@ with open('BasslineLibrary.pickle', 'wb') as f:
     
 ## TODO Should special moves be coupled to eachother
 
-#%% create embeddings
-import numpy as np
-import pickle
-
-# Load the list back from the Pickle file
-with open('BasslineLibrary.pickle', 'rb') as f:
-    BasslineLibrary = pickle.load(f)
-    
-embedding_size = (21+3)*4 + 9 # 21 frets (incl zeroth), 3 special notes (dead, none and bar) and 9 special moves
-Embeddings_weights = skipgram(BasslineLibrary.Data, vocab_size=len(BasslineLibrary.library),
-                              embedding_size=embedding_size, window_size=8)
-
-
-np.save('Embeddings.npy', Embeddings_weights)
 
