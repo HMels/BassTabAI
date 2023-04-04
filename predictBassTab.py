@@ -38,7 +38,7 @@ class PredictBassTab(tf.keras.Model):
         return output
 
 
-def train_model(Tokens, embedding_weights, epochs=10, batch_size=128, learning_rate=0.001):
+def train_model(Tokens, embedding_weights, epochs=10, batch_size=128, num_batches_perstep=10, batch_stop=None, learning_rate=0.001):
     """
     Trains a neural network using the pre-trained word embeddings on a list of tokenized inputs and targets.
 
@@ -46,48 +46,59 @@ def train_model(Tokens, embedding_weights, epochs=10, batch_size=128, learning_r
         inputs (list): A list of tokenized inputs.
         targets (list): A list of targets to predict.
         embedding_weights (numpy array): A numpy array of shape (vocab_size, embedding_size) containing the pre-trained word embeddings.
-        vocab_size (int): The size of the vocabulary to use.
-        embedding_size (int): The size of the embedding vectors.
-        output_sequence (int): The number of tokens to predict (default None).
         epochs (int): The number of epochs to train for (default 10).
         batch_size (int): The batch size to use for training (default 128).
+        num_batches_perstep (int): The amount of batches  it will optimize per time.
+        batch_stop (int): The maximum amounts of batches to be processed. If None, it will not be triggered. (default None)
         learning_rate (float): The learning rate to use for optimization (default 0.001).
 
     Returns:
         A trained TensorFlow model.
     """
     # Initialize the model and loss function.
+    if batch_stop is None: batch_stop=int(len(Tokens)/batch_size/num_batches_perstep)
+    global model
     model = PredictBassTab(embedding_weights)
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-
-    # Prepare the training dataset.
-    inputs_ = []
-    targets_ = []
-    for input_tokens in Tokens:
-        #input_tokens = tf.boolean_mask(Token, Token!=1)
-        for i in range(input_tokens.shape[0]):
-            inputs_.append(input_tokens[i])
-            targets_.append(input_tokens[i])
-    inputs_ = np.array(inputs_)
-    targets_ = np.array(targets_)
-    dataset = tf.data.Dataset.from_tensor_slices((inputs_, targets_)).shuffle(buffer_size=len(inputs_)).batch(batch_size)
-
-    # Train the model.
-    for epoch in range(epochs):
-        epoch_loss = 0
-        for input_batch, target_batch1 in dataset:
-            with tf.GradientTape() as tape:
-                output = model(input_batch)
-                target_batch = tf.one_hot(tf.squeeze(target_batch1), depth=output.shape[1])
-                loss = tf.reduce_mean(tf.square(output - target_batch))#     tf.keras.losses.CategoricalCrossentropy(output, target_batch)  #           
     
-            gradients = tape.gradient(loss, model.trainable_variables)
-            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-            epoch_loss += loss
-        print('Epoch:',epoch+1, 'Loss:', epoch_loss)
-
-    return model
-
+    # iterate over the batchers
+    step_batch=0
+    for i in range(0, len(Tokens), batch_size*num_batches_perstep):
+        if step_batch==batch_stop: break
+        print("Training Model - Batch: "+str(step_batch)+"/"
+              +str(min(np.round(len(Tokens)/batch_size/num_batches_perstep),batch_stop)))
+        step_batch+=1
+        
+        # Prepare the training dataset.
+        inputs_ = []
+        targets_ = []
+        batch_tokens = Tokens[i:min(i+batch_size*num_batches_perstep, len(Tokens)-1)]
+        for input_tokens in batch_tokens:
+            #input_tokens = tf.boolean_mask(Token, Token!=1)
+            for i in range(input_tokens.shape[0]):
+                inputs_.append(input_tokens[i])
+                targets_.append(input_tokens[i])
+        inputs_ = np.array(inputs_)
+        targets_ = np.array(targets_)
+        dataset = tf.data.Dataset.from_tensor_slices((inputs_, targets_)).shuffle(buffer_size=len(inputs_)).batch(batch_size)
+    
+        # Train the model.
+        for epoch in range(epochs):
+            epoch_loss = 0
+            for input_batch, target_batch1 in dataset:
+                with tf.GradientTape() as tape:
+                    output = model(input_batch)
+                    target_batch = tf.one_hot(tf.squeeze(target_batch1), depth=output.shape[1])
+                    loss = tf.reduce_mean(tf.square(output - target_batch))#     tf.keras.losses.CategoricalCrossentropy(output, target_batch)  #           
+        
+                gradients = tape.gradient(loss, model.trainable_variables)
+                optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+                epoch_loss += loss
+            print('Epoch:',epoch+1, 'Loss:', epoch_loss.numpy())
+            
+        # save model per step to prevent data to be lost after crash
+        model.save('PredictBassTab')
+            
 
 #%% loading model
 # Load the list from the Pickle file
@@ -98,7 +109,7 @@ with open('BasslineLibrary.pickle', 'rb') as f:
 embedding_weights = np.load('Embeddings.npy')
 
 # Train the model.
-model = train_model(BasslineLibrary.Data, embedding_weights)
+train_model(BasslineLibrary.Data, embedding_weights)
 model.save('PredictBassTab')
 
 
@@ -108,9 +119,9 @@ model = keras.models.load_model('PredictBassTab')
 
 
 #%% Testing
-i = 108
+i = 120
 input_data = BasslineLibrary.Data[i]
-index_bar1 = np.where(input_data==0)[0][1]
+index_bar1 = np.where(input_data==0)[0][1]//2
 
 # Use the trained model to make predictions.
 test_input = np.array(input_data.numpy()[:index_bar1])#[:int(input_data.shape[0]/2)+1])
@@ -122,7 +133,7 @@ print("Input first half of",BasslineLibrary.names[i]+':')
 BasslineLibrary.print_detokenize(input_data)
 
 print("Generated by the model")
-BasslineLibrary.print_detokenize(np.concatenate([test_input,prediction]))
+BasslineLibrary.print_detokenize(np.concatenate([test_input,prediction,[0]]))
 
 
 '''
