@@ -9,6 +9,7 @@ import tensorflow as tf
 import numpy as np
 
 #from Tab2Vec import SkipGramModel
+'''
 class PredictBassTab(tf.keras.Model):
     def __init__(self, embedding_weights):
         super(PredictBassTab, self).__init__()
@@ -36,6 +37,36 @@ class PredictBassTab(tf.keras.Model):
         dropout2 = self.dropout_layer2(dense2)
         output = self.output_layer(dropout2)
         return output
+'''
+
+class PredictBassTab(tf.keras.Model):
+    def __init__(self, embedding_weights):
+        super(PredictBassTab, self).__init__()
+        self.embedding_layer = tf.keras.layers.Embedding(
+            input_dim=embedding_weights.shape[0], 
+            output_dim=embedding_weights.shape[1], 
+            weights=[embedding_weights], 
+            trainable=False,
+            name='embedding'
+        )
+        self.lstm_layer1 = tf.keras.layers.LSTM(256, return_sequences=True)
+        self.dropout_layer1 = tf.keras.layers.Dropout(0.5)
+        self.lstm_layer2 = tf.keras.layers.LSTM(128, return_sequences=True)
+        self.dropout_layer2 = tf.keras.layers.Dropout(0.5)
+        self.output_layer = tf.keras.layers.Dense(embedding_weights.shape[0], activation='softmax')
+
+    @tf.function
+    def call(self, inputs, max_sequence_length):
+        embedding = self.embedding_layer(inputs)
+        lstm1 = self.lstm_layer1(embedding)
+        dropout1 = self.dropout_layer1(lstm1)
+        lstm2 = self.lstm_layer2(dropout1)
+        dropout2 = self.dropout_layer2(lstm2)
+        outputs = []
+        for i in range(max_sequence_length):
+            output = self.output_layer(dropout2[:, i, :])
+            outputs.append(output)
+        return tf.stack(outputs, axis=1)
 
 
 def train_model(Tokens, embedding_weights, epochs=10, batch_size=128, num_batches_perstep=10, batch_stop=None, learning_rate=0.001):
@@ -76,7 +107,9 @@ def train_model(Tokens, embedding_weights, epochs=10, batch_size=128, num_batche
         for input_tokens in batch_tokens:
             #input_tokens = tf.boolean_mask(Token, Token!=1)
             for i in range(input_tokens.shape[0]):
-                inputs_.append(input_tokens[i])
+            #    inputs_.append(input_tokens[i])
+            #    targets_.append(input_tokens[i])
+                inputs_.append(input_tokens[:i])
                 targets_.append(input_tokens[i])
         inputs_ = np.array(inputs_)
         targets_ = np.array(targets_)
@@ -87,7 +120,7 @@ def train_model(Tokens, embedding_weights, epochs=10, batch_size=128, num_batche
             epoch_loss = 0
             for input_batch, target_batch1 in dataset:
                 with tf.GradientTape() as tape:
-                    output = model(input_batch)
+                    output = model(input_batch,1)
                     target_batch = tf.one_hot(tf.squeeze(target_batch1), depth=output.shape[1])
                     loss = tf.reduce_mean(tf.square(output - target_batch))#     tf.keras.losses.CategoricalCrossentropy(output, target_batch)  #           
         
@@ -97,7 +130,7 @@ def train_model(Tokens, embedding_weights, epochs=10, batch_size=128, num_batche
             print('Epoch:',epoch+1, 'Loss:', epoch_loss.numpy())
             
         # save model per step to prevent data to be lost after crash
-        model.save('PredictBassTab')
+        model.save('PredictBassTab_temp')
             
 
 #%% loading model
@@ -109,8 +142,8 @@ with open('BasslineLibrary.pickle', 'rb') as f:
 embedding_weights = np.load('Embeddings.npy')
 
 # Train the model.
-train_model(BasslineLibrary.Data, embedding_weights)
-model.save('PredictBassTab')
+train_model(BasslineLibrary.Data, embedding_weights, batch_stop=1)
+model.save('PredictBassTab_temp')
 
 
 #%% load model
@@ -118,13 +151,29 @@ from tensorflow import keras
 model = keras.models.load_model('PredictBassTab')
 
 
+# Generate a sequence of predicted outputs
+input_sequence = [1, 5, 10, 0]  # Example input sequence
+input_sequence = np.array([input_sequence])
+max_sequence_length = 10  # Maximum length of output sequence
+predicted_outputs = model.predict(input_sequence, max_sequence_length)
+
+# Convert predicted outputs to integer token sequence
+predicted_sequence = np.argmax(predicted_outputs, axis=-1)
+predicted_sequence = predicted_sequence[0].tolist()
+
+# Print the predicted sequence
+BasslineLibrary.print_detokenize(predicted_sequence)
+
+#BasslineLibrary.print_detokenize(np.concatenate([test_input,prediction,[0]]))
+
+'''
 #%% Testing
 i = 120
 input_data = BasslineLibrary.Data[i]
-index_bar1 = np.where(input_data==0)[0][1]//2
+index_bar = np.where(input_data==0)[0][1]//2
 
 # Use the trained model to make predictions.
-test_input = np.array(input_data.numpy()[:index_bar1])#[:int(input_data.shape[0]/2)+1])
+test_input = np.array(input_data.numpy()[:index_bar])
 output = model.predict(test_input)
 
 prediction = tf.argmax(output, axis=1, output_type=tf.int32).numpy()
@@ -134,7 +183,7 @@ BasslineLibrary.print_detokenize(input_data)
 
 print("Generated by the model")
 BasslineLibrary.print_detokenize(np.concatenate([test_input,prediction,[0]]))
-
+'''
 
 '''
 The issue you're facing is likely due to the model not being complex enough to learn the patterns in the data.

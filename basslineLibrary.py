@@ -134,10 +134,14 @@ class BasslineLibrary:
         # print the tab
         G,D,A,E = self.detokenize(translated_bassline)
         #for i in range(len(A)):
-        print("G"+G)
-        print("D"+D)
-        print("A"+A)
-        print("E"+E,'\n')   
+        if G[0]=="|": print("G"+G)
+        else: print("G|"+G) 
+        if G[0]=="|": print("D"+D)
+        else: print("D|"+D)
+        if G[0]=="|": print("A"+A)
+        else: print("A|"+A)
+        if G[0]=="|": print("E"+E,'\n') 
+        else: print("E|"+E,'\n')  
         
         
     def detokenize(self, translated_bassline):
