@@ -22,32 +22,7 @@ with open('BasslineLibrary.pickle', 'rb') as f:
 embedding_weights = np.load('Embeddings.npy')
 
 
-#%% the functions
-def build_model(max_len, vocab_size):
-    '''
-    Builds the model
-
-    Parameters
-    ----------
-    max_len : int
-        The maximum length of the input. This will be the window size of teh training data.
-    vocab_size : int
-        The size of the vocabulary.
-
-    Returns
-    -------
-    model : keras.model
-        The model that needs to be trained.
-
-    '''
-    inputs = layers.Input(shape=(max_len, vocab_size))
-    x = layers.LSTM(128)(inputs)
-    output = layers.Dense(vocab_size, activation=tf.nn.softmax)(x)
-    model = Model(inputs, output)
-    model.compile(optimizer='adam', loss='categorical_crossentropy')
-    return model
-
-
+#%% input data
 def preprocess_split(Tokens, window_size, step):
     '''
     Puts the input data in the correct format. 
@@ -94,7 +69,6 @@ def preprocess_split(Tokens, window_size, step):
     return Inputs, targets, dict_size
 
 
-#%% input data
 window_size = 8
 input_data = BasslineLibrary.Data[:400]
 
@@ -102,6 +76,34 @@ Inputs, targets, dict_size = preprocess_split(input_data, window_size, step=4)
 
 
 #%% building the model
+def build_model(max_len, vocab_size):
+    '''
+    Builds the model
+
+    Parameters
+    ----------
+    max_len : int
+        The maximum length of the input. This will be the window size of the training data.
+    vocab_size : int
+        The size of the vocabulary.
+
+    Returns
+    -------
+    model : keras.model
+        The model that needs to be trained.
+
+    '''
+    inputs = layers.Input(shape=(max_len, vocab_size))
+    lstm1 = layers.LSTM(256)(inputs)
+    dropout1 = layers.Dropout(0.5)(lstm1)
+    #lstm2 = layers.LSTM(128, return_sequences=True, input_shape=(max_len, vocab_size))(dropout1)
+    #dropout2 = layers.Dropout(0.5)(lstm2)
+    output = layers.Dense(vocab_size, activation=tf.nn.softmax)(dropout1)
+    model = Model(inputs, output)
+    model.compile(optimizer='adam', loss='categorical_crossentropy')
+    return model
+
+
 model = build_model(window_size, dict_size)
 model.summary()
 
@@ -116,7 +118,7 @@ def plot_learning_curve(history):
     plt.ylim(0)
     plt.show()
 
-history = model.fit(Inputs, targets, epochs=50, batch_size=128)
+history = model.fit(Inputs, targets, epochs=100, batch_size=128)
 plot_learning_curve(history)
 
 
@@ -197,11 +199,11 @@ def generate_bassline(model, BasslineLibrary, seed, dict_size, input_num=8, temp
     print("\nReference Bassline - Song: "+BasslineLibrary.names[seed])
     BasslineLibrary.print_detokenize(BasslineLibrary.Data[seed])
     
-    print("\nInput Bassline - Song: "+BasslineLibrary.names[seed])
+    print("\nInput Bassline")
     BasslineLibrary.print_detokenize(np.argwhere(bassline)[:input_num,1])
     
     print("\nPredicted Bassline")
     BasslineLibrary.print_detokenize(np.append(np.argwhere(bassline)[:,1], [0]))
 
 
-generate_bassline(model, BasslineLibrary, 110, dict_size, temperature=3)
+generate_bassline(model, BasslineLibrary, 110, dict_size, temperature=1, input_num=window_size)
