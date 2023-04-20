@@ -75,6 +75,13 @@ class BasslineLibrary:
         dict: The library of counts with their assigned numbers.
         """
         return self.library
+    
+    
+    def inverse_library(self, index):
+        for string, i in self.library.items():
+            if i == index:
+                return string
+        raise ValueError(f"Index {index} is not in the library")
 
 
     def translate_bassline(self, bassline):

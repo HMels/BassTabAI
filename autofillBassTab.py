@@ -58,7 +58,12 @@ def preprocess_split(Tokens, window_size, step):
     dict_size = 0
     for Token in Tokens:
         input_tokens = tf.boolean_mask(Token, Token!=0)
-        dict_size = max(dict_size, max(input_tokens.numpy())+1)
+        
+        # We generate a temporary dictionary that is smaller than the original. This works
+        # because the first so-many dictionary inputs correspond to the ones that can be found 
+        # in the first so-many tabs. As we cut off tabs above a certain number, we can therefore
+        # also cut off part of the dictionary. 
+        dict_size = max(dict_size, max(input_tokens.numpy())+1)   
         for i in range(0, input_tokens.shape[0] - window_size, step):
             input_.append(input_tokens[i: i + window_size].numpy())
             target_.append(input_tokens[i + window_size].numpy())
@@ -75,9 +80,45 @@ def preprocess_split(Tokens, window_size, step):
 
 
 window_size = 16
-input_data = BasslineLibrary.Data[:400]
+Input_data, target_data, dict_size = preprocess_split(BasslineLibrary.Data[:800], window_size, step=4)
 
-Inputs, targets, dict_size = preprocess_split(input_data, window_size, step=4)
+
+#%% create validation data
+def split_data(Input_data, target_data, split_ratio=0.8, seed=None):
+    """
+    Randomly splits the input and target tensors into training and validation sets.
+
+    Args:
+    - Input_data: A tensor containing the input data.
+    - target_data: A tensor containing the target data.
+    - split_ratio: The ratio of data to use for training. The rest will be used for validation. Default is 0.8.
+    - seed: Optional random seed for reproducibility.
+
+    Returns:
+    - A tuple containing the training and validation datasets, each as a tuple of (Input_data, target_data).
+    """
+    num_elements = tf.shape(Input_data)[0].numpy()
+
+    # Generate a random permutation of the indices
+    if seed is not None:
+        indices = tf.random.shuffle(tf.range(num_elements), seed=seed)
+    else:
+        indices = tf.random.shuffle(tf.range(num_elements))
+
+    # Determine the split point
+    split_point = int(num_elements * split_ratio)
+    
+    # Split the indices into training and validation indices
+    train_indices = indices[:split_point]
+    val_indices = indices[split_point:]
+
+    # Create the training and validation datasets
+    return ( tf.gather(Input_data, train_indices), tf.gather(target_data, train_indices), 
+            tf.gather(Input_data, val_indices), tf.gather(target_data, val_indices) )
+
+
+Inputs, targets, Inputs_val, targets_val = split_data(Input_data, target_data, split_ratio=.5, seed=None)
+validation_data = (Inputs_val, targets_val)
 
 
 #%% building the model
@@ -99,7 +140,6 @@ def build_model(max_len, vocab_size, embedding_weights):
 
     '''
     inputs = layers.Input(shape=(max_len, vocab_size))
-    print(inputs.shape)
     embeddings = layers.Embedding(
         input_dim=embedding_weights.shape[0], 
         output_dim=embedding_weights.shape[1], 
@@ -122,14 +162,17 @@ model.summary()
 #%% Train model
 def plot_learning_curve(history):
     loss = history.history['loss']
+    val_loss = history.history['val_loss'] # new line
     epochs = [i for i, _ in enumerate(loss)]
-    plt.scatter(epochs, loss, color='skyblue')
+    plt.plot(epochs, loss, color='skyblue', label='Training Loss') # changed to plot
+    plt.plot(epochs, val_loss, color='red', label='Validation Loss') # new line
     plt.xlabel('Epochs'); plt.ylabel('Cross Entropy Loss')
     plt.xlim([0,history.params['epochs']])
     plt.ylim(0)
+    plt.legend() # new line
     plt.show()
 
-history = model.fit(Inputs, targets, epochs=50, batch_size=128)
+history = model.fit(Inputs, targets, epochs=50, batch_size=128, validation_data=validation_data)
 plot_learning_curve(history)
 
 
@@ -138,11 +181,11 @@ tf.saved_model.save(model, 'autofillBasTab')
 
 
 #%% loading the model
-import numpy as np
-import tensorflow as tf
+#import numpy as np
+#import tensorflow as tf
 
 
-one_step_reloaded = tf.saved_model.load('autofillBasTab')
+#model = tf.saved_model.load('autofillBasTab')
 
 
 #%% 

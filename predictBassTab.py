@@ -92,7 +92,7 @@ def train_model(Tokens, embedding_weights, epochs=10, batch_size=128, num_batche
     model = PredictBassTab(embedding_weights)
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     
-    # iterate over the batchers
+    # iterate over the batches
     step_batch=0
     for i in range(0, len(Tokens), batch_size*num_batches_perstep):
         if step_batch==batch_stop: break
@@ -106,13 +106,13 @@ def train_model(Tokens, embedding_weights, epochs=10, batch_size=128, num_batche
         batch_tokens = Tokens[i:min(i+batch_size*num_batches_perstep, len(Tokens)-1)]
         for input_tokens in batch_tokens:
             #input_tokens = tf.boolean_mask(Token, Token!=1)
-            for i in range(input_tokens.shape[0]):
-            #    inputs_.append(input_tokens[i])
-            #    targets_.append(input_tokens[i])
-                inputs_.append(input_tokens[:i])
-                targets_.append(input_tokens[i])
+            for i in range(1, input_tokens.shape[0]):
+                inputs_.append(input_tokens[i-1].numpy()) ##TODO must be :i
+                targets_.append(input_tokens[i].numpy())
         inputs_ = np.array(inputs_)
         targets_ = np.array(targets_)
+        print(inputs_)
+        print(targets_)
         dataset = tf.data.Dataset.from_tensor_slices((inputs_, targets_)).shuffle(buffer_size=len(inputs_)).batch(batch_size)
     
         # Train the model.
@@ -152,7 +152,7 @@ model = keras.models.load_model('PredictBassTab')
 
 
 # Generate a sequence of predicted outputs
-input_sequence = [1, 5, 10, 0]  # Example input sequence
+input_sequence = [1, 5, 1, 1, 6]  # Example input sequence
 input_sequence = np.array([input_sequence])
 max_sequence_length = 10  # Maximum length of output sequence
 predicted_outputs = model.predict(input_sequence, max_sequence_length)
