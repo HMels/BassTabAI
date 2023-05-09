@@ -85,7 +85,7 @@ def preprocess_split(Tokens, window_size, step):
     return Inputs, targets, dict_size
     '''
 
-window_size = 16
+window_size = 12
 Input_data, target_data, dict_size = preprocess_split(BasslineLibrary.Data[:800], window_size, step=4)
 
 
@@ -128,7 +128,7 @@ validation_data = (Inputs_val, tf.one_hot(targets_val, dict_size))
 
 
 #%% build the model
-class MyModel(tf.keras.Model):
+class MyModel1(tf.keras.Model):
   def __init__(self, dict_size, embedding_weights, rnn_units):
     super().__init__(self)
     # input should be (BATCH_SIZE, SEQUENCE_LENGTH) 
@@ -156,6 +156,41 @@ class MyModel(tf.keras.Model):
     #  states = self.gru.get_initial_state(conv1d)
     #gru, states = self.gru(conv1d, initial_state=states, training=training)
     flatten = self.flatten(conv1d)
+    outputs = self.dense(flatten, training=training)
+
+    if return_state:
+      return outputs, states
+    else:
+      return outputs
+  
+    
+class MyModel(tf.keras.Model):
+  def __init__(self, dict_size, embedding_weights, rnn_units):
+    super().__init__(self)
+    # input should be (BATCH_SIZE, SEQUENCE_LENGTH) 
+    # so vectorize doesn't mean actually creating a vector of size (BATCH_SIZE, SEQUENCE_LENGTH, dict_size)
+    #self.conv1d = layers.Conv1D(filters=64, kernel_size=3, padding='same', activation='relu')
+    self.embedding =  layers.Embedding(
+        input_dim=embedding_weights.shape[0], 
+        output_dim=embedding_weights.shape[1], 
+        weights=[embedding_weights], 
+        trainable=False,
+        name='embedding'
+    )
+    self.gru = tf.keras.layers.GRU(rnn_units,
+                                   return_sequences=True,
+                                   return_state=True)
+    self.flatten =tf.keras.layers.Flatten()
+    self.dense = tf.keras.layers.Dense(dict_size, activation='softmax')
+
+  @tf.function
+  def call(self, inputs, states=None, return_state=False, training=False):
+    embedding = self.embedding(inputs, training=False)
+    #conv1d = self.conv1d(inputs)
+    if states is None:
+      states = self.gru.get_initial_state(embedding)
+    gru, states = self.gru(embedding, initial_state=states, training=training)
+    flatten = self.flatten(gru)
     outputs = self.dense(flatten, training=training)
 
     if return_state:

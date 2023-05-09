@@ -67,19 +67,10 @@ def preprocess_split(Tokens, window_size, step):
         for i in range(0, input_tokens.shape[0] - window_size, step):
             input_.append(input_tokens[i: i + window_size].numpy())
             target_.append(input_tokens[i + window_size].numpy())
-        
-    # Create matrices from the inputs and targets
-    Inputs = np.zeros((len(input_), window_size, dict_size), dtype=bool)
-    targets = np.zeros((len(target_), dict_size), dtype=bool)
-    for i, input_i in enumerate(input_):
-        for j, input_ij in enumerate(input_i):
-            Inputs[i, j, input_ij] = 1
-        targets[i, target_[i]] = 1
-        
-    return Inputs, targets, dict_size
+    return tf.stack(input_), tf.stack(target_), dict_size
 
 
-window_size = 16
+window_size = 12
 Input_data, target_data, dict_size = preprocess_split(BasslineLibrary.Data[:800], window_size, step=4)
 
 
@@ -118,45 +109,49 @@ def split_data(Input_data, target_data, split_ratio=0.8, seed=None):
 
 
 Inputs, targets, Inputs_val, targets_val = split_data(Input_data, target_data, split_ratio=.5, seed=None)
-validation_data = (Inputs_val, targets_val)
+validation_data = (Inputs_val, tf.one_hot(targets_val, dict_size))
 
 
-#%% building the model
-def build_model(max_len, vocab_size, embedding_weights):
-    '''
-    Builds the model
-
-    Parameters
-    ----------
-    max_len : int
-        The maximum length of the input. This will be the window size of teh training data.
-    vocab_size : int
-        The size of the vocabulary.
-
-    Returns
-    -------
-    model : keras.model
-        The model that needs to be trained.
-
-    '''
-    inputs = layers.Input(shape=(max_len, vocab_size))
-    embeddings = layers.Embedding(
+#%% building the model #2
+class MyModel(tf.keras.Model):
+  def __init__(self, dict_size, embedding_weights, rnn_units):
+    super().__init__(self)
+    # input should be (BATCH_SIZE, SEQUENCE_LENGTH) 
+    # so vectorize doesn't mean actually creating a vector of size (BATCH_SIZE, SEQUENCE_LENGTH, dict_size)
+    #self.conv1d = layers.Conv1D(filters=64, kernel_size=3, padding='same', activation='relu')
+    self.embedding =  layers.Embedding(
         input_dim=embedding_weights.shape[0], 
         output_dim=embedding_weights.shape[1], 
         weights=[embedding_weights], 
         trainable=False,
         name='embedding'
-    )(inputs)
-    conv1d = layers.Conv1D(filters=64, kernel_size=3, padding='same', activation='relu')(embeddings)
-    flatten = layers.Flatten()(conv1d)
-    output = layers.Dense(vocab_size, activation='softmax')(flatten)
-    model = Model(inputs, output)
-    model.compile(optimizer='adam', loss='categorical_crossentropy')
-    return model
+    )
+    self.gru = tf.keras.layers.GRU(rnn_units,
+                                   return_sequences=True,
+                                   return_state=True)
+    self.flatten =tf.keras.layers.Flatten()
+    self.dense = tf.keras.layers.Dense(dict_size, activation='softmax')
+
+  @tf.function
+  def call(self, inputs, states=None, return_state=False, training=False):
+    embedding = self.embedding(inputs, training=False)
+    #conv1d = self.conv1d(inputs)
+    if states is None:
+      states = self.gru.get_initial_state(embedding)
+    gru, states = self.gru(embedding, initial_state=states, training=training)
+    flatten = self.flatten(gru)
+    outputs = self.dense(flatten, training=training)
+
+    if return_state:
+      return outputs, states
+    else:
+      return outputs
 
 
-model = build_model(window_size, dict_size, embedding_weights)
-model.summary()
+model = MyModel(dict_size, embedding_weights, rnn_units = 64)
+#model.build(input_shape=(None, window_size))
+model.compile(optimizer='adam', loss='categorical_crossentropy')
+#model.summary()
 
 
 #%% Train model
@@ -172,12 +167,12 @@ def plot_learning_curve(history):
     plt.legend() # new line
     plt.show()
 
-history = model.fit(Inputs, targets, epochs=50, batch_size=128, validation_data=validation_data)
+history = model.fit(Inputs, tf.one_hot(targets, dict_size), epochs=10, batch_size=128, validation_data=validation_data)
 plot_learning_curve(history)
 
 
 #%% saving the model
-tf.saved_model.save(model, 'autofillBasTab')
+#tf.saved_model.save(model, 'autofillBasTab')
 
 
 #%% loading the model
