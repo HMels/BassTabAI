@@ -31,6 +31,7 @@ Right now the architecture of the program is the following:
 	3.2 Next we split the input data into a training and a validation dataset, with 80% of the dataset being used for training, and the rest for validation.
 	
 	3.3 Training: Right now we have decided the neural network architecture to be as given below. We have chosen to use a GRU (Gated Recurrent Unit) as it can remember states. This will come in handy as the model will then be able to memorise its state during previous predictions and thus be more coherent when predicting multiple tokens in sequence.
+		
 		_________________________________________________________________
 		 Layer (type)                Output Shape              Param #   
 		=================================================================
@@ -48,7 +49,7 @@ Right now the architecture of the program is the following:
 		Non-trainable params: 0
 		_________________________________________________________________
 		
-		During training we discovered that using a pretrained embedding does not work well. Therefore we also train the embedding with all the other layers. The dense layer is the output layers. 
+	During training we discovered that using a pretrained embedding does not work well. Therefore we also train the embedding with all the other layers. The dense layer is the output layers. 
 			
 
 	3.4 After training, we let the model take in part of the song, and make it predict the next token step for step. This next token is then added to the total tableture, and will thereafter be used in predicting the following tokens. States of the GRU layers are also passed to the next iteration. This iterative process is repeated till the predicted tab is as large as the original. 
