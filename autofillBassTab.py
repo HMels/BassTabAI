@@ -23,8 +23,21 @@ with open('BasslineLibrary.pickle', 'rb') as f:
 embedding_weights = np.load('Embeddings.npy')
 
 
+#%% Parameters
+# Data 
+N = 6000                                                                       # amount of data
+window_size = 12                                                               # the input token length
+prediction_length = 6                                                          # the number of tokens to predict per step 
+step = 3                                                                       # number of tokens to jump in training 
+split_ratio=.75                                                                 # training / validation split
+
+# Training
+BATCH_SIZE=128
+EPOCHS=7
+
+
 #%% prepare data for training
-def preprocess_split(Tokens, window_size, step):
+def preprocess_split(Tokens, window_size, prediction_length, step):
     '''
     Puts the input data in the correct format. 
 
@@ -60,14 +73,13 @@ def preprocess_split(Tokens, window_size, step):
         # in the first so-many tabs. As we cut off tabs above a certain number, we can therefore
         # also cut off part of the dictionary. 
         dict_size = max(dict_size, max(input_tokens.numpy())+1)   
-        for i in range(0, input_tokens.shape[0] - window_size, step):
+        for i in range(0, input_tokens.shape[0] - window_size - prediction_length, step):
             input_.append(input_tokens[i: i + window_size].numpy())
-            target_.append(input_tokens[i + window_size].numpy())
+            target_.append(input_tokens[i + window_size: i + window_size + prediction_length].numpy())
     return tf.stack(input_), tf.stack(target_), dict_size
 
-window_size = 12
-Input_data, target_data, dict_size = preprocess_split(BasslineLibrary.Data[:5000], window_size, step=4)
-##TODO make it predict the 4 next steps
+Input_data, target_data, dict_size = preprocess_split(BasslineLibrary.Data[:N], window_size, prediction_length, step)
+
 
 #%% create validation data
 def batch_shuffle(num_elements, seed=None, BATCH_SIZE=64):
@@ -142,13 +154,12 @@ def split_data(Input_data, target_data, split_ratio=0.8, seed=None, BATCH_SIZE=3
             tf.gather(Input_data, val_indices), tf.gather(target_data, val_indices) )
 
 
-Inputs, targets, Inputs_val, targets_val = split_data(Input_data, target_data, split_ratio=.8, seed=None, BATCH_SIZE=window_size)
-validation_data = (Inputs_val, tf.one_hot(targets_val, dict_size))
+Inputs, targets, Inputs_val, targets_val = split_data(Input_data, target_data, split_ratio=split_ratio, seed=None, BATCH_SIZE=window_size)
 
 
 #%% building the model
 class MyModel(tf.keras.Model):
-  def __init__(self, dict_size, embedding_weights, rnn_units):
+  def __init__(self, dict_size, embedding_weights, rnn_units, prediction_length):
     super().__init__(self)
     # input should be (BATCH_SIZE, SEQUENCE_LENGTH) 
     # so vectorize doesn't mean actually creating a vector of size (BATCH_SIZE, SEQUENCE_LENGTH, dict_size)
@@ -161,8 +172,9 @@ class MyModel(tf.keras.Model):
     )
     self.gru = tf.keras.layers.GRU(rnn_units, return_sequences=True, return_state=True)
     self.flatten =tf.keras.layers.Flatten()
-    self.dense = tf.keras.layers.Dense(dict_size, activation='softmax')
-
+    self.dense = tf.keras.layers.Dense(dict_size*prediction_length, activation='softmax')
+    self.reshape = tf.keras.layers.Reshape((prediction_length, dict_size))
+    
   @tf.function
   def call(self, inputs, states=None, return_state=False, training=False):
     embedding = self.embedding(inputs, training=True)
@@ -170,14 +182,16 @@ class MyModel(tf.keras.Model):
       states = self.gru.get_initial_state(embedding)
     gru, states = self.gru(embedding, initial_state=states, training=training)
     flatten = self.flatten(gru)
-    outputs = self.dense(flatten, training=training)
-
+    outputs  = self.dense(flatten, training=training)
+    reshaped_outputs = self.reshape(outputs)
+    
     if return_state:
-      return outputs, states
+      return reshaped_outputs, states
     else:
-      return outputs
+      return reshaped_outputs
 
-model = MyModel(dict_size, embedding_weights, rnn_units = 128)
+
+model = MyModel(dict_size, embedding_weights, rnn_units = 128, prediction_length=prediction_length)
 model.compile(optimizer='adam', loss='categorical_crossentropy')
 
 
@@ -195,9 +209,9 @@ def plot_learning_curve(history):
     plt.ylim(0)
     plt.legend() 
     plt.show()
-
-BATCH_SIZE=128
-EPOCHS=4
+    
+validation_data = (Inputs_val, tf.one_hot(targets_val, dict_size)) ##TODO do I still need the one hot them
+#validation_data = (Inputs_val, targets_val)
 history = model.fit(Inputs, tf.one_hot(targets, dict_size), epochs=EPOCHS, batch_size=BATCH_SIZE, validation_data=validation_data)
 plot_learning_curve(history)
 
@@ -234,7 +248,7 @@ def random_predict(prediction, temperature):
         return np.argwhere(final_pred)
 
 
-def generate_bassline(model, BasslineLibrary, seed, dict_size, input_num=8, temperature=.5, max_len=60, states=None):
+def generate_bassline(model, BasslineLibrary, seed, dict_size, prediction_length, input_num=8, temperature=.5, max_len=60, states=None):
     '''
     Inputs a bassline from a seed with a certain input size, and will try to predict the 
     following notes according to the trained model together with a temperature for randomness
@@ -263,17 +277,20 @@ def generate_bassline(model, BasslineLibrary, seed, dict_size, input_num=8, temp
 
     # iteratively predict the next tokens till the bar if filled
     iter_num = BasslineLibrary.Data[seed].shape[0] - input_num -1
-    for i in range(iter_num):
-        pred1, states = model(input_tokens[None,i:input_num+i], states=states, return_state=True)
-        prediction = random_predict(pred1[0,:], temperature)
-        input_tokens = np.concatenate([input_tokens,prediction[0]])
-        temperature=temperature*.999
+    for i in range(0, iter_num, prediction_length):
+        prediction_mat, states = model(input_tokens[None,i:input_num+i], states=states, return_state=True)
+        prediction_mat = tf.squeeze(prediction_mat)
+        for j in range(prediction_length):
+            pred1 = tf.gather(prediction_mat, j)
+            prediction = random_predict(pred1, temperature)
+            input_tokens = np.concatenate([input_tokens,prediction[0]])
+            temperature=temperature*.999
+        ## TODO and an EOL here.
         
     print("\nPredicted Bassline")
     BasslineLibrary.print_detokenize(np.append(input_tokens, [0]))
 
 seed=50
-# print the input bassline
 print("\nReference Bassline - Song: "+BasslineLibrary.names[seed])
 BasslineLibrary.print_detokenize(BasslineLibrary.Data[seed])
 
@@ -281,4 +298,4 @@ print("\nInput Bassline - Song: "+BasslineLibrary.names[seed])
 BasslineLibrary.print_detokenize(BasslineLibrary.Data[seed][:window_size])
 
 for _ in range(3):
-    generate_bassline(model, BasslineLibrary, seed, dict_size, temperature=.99, input_num=window_size)
+    generate_bassline(model, BasslineLibrary, seed, dict_size, prediction_length, temperature=.9, input_num=window_size)
