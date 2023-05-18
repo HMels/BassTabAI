@@ -200,7 +200,7 @@ BATCH_SIZE=128
 EPOCHS=4
 history = model.fit(Inputs, tf.one_hot(targets, dict_size), epochs=EPOCHS, batch_size=BATCH_SIZE, validation_data=validation_data)
 plot_learning_curve(history)
-##TODO does the mixing of datasets before not negate the whole states thing? Is this actually part of training? How does the source do it?
+
 
 #%% 
 def random_predict(prediction, temperature):
@@ -267,7 +267,7 @@ def generate_bassline(model, BasslineLibrary, seed, dict_size, input_num=8, temp
         pred1, states = model(input_tokens[None,i:input_num+i], states=states, return_state=True)
         prediction = random_predict(pred1[0,:], temperature)
         input_tokens = np.concatenate([input_tokens,prediction[0]])
-        temperature=temperature*.997
+        temperature=temperature*.999
         
     print("\nPredicted Bassline")
     BasslineLibrary.print_detokenize(np.append(input_tokens, [0]))
