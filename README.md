@@ -35,43 +35,48 @@ Right now the architecture of the program is the following:
 		_________________________________________________________________
 		 Layer (type)                Output Shape              Param #   
 		=================================================================
-		 embedding (Embedding)       (12x105x256)              147210    
+		 embedding (Embedding)       multiple                  147210    
 																		 
-		 gru_6 (GRU)                 (12x128)		           90240     
+		 gru    (GRU)                multiple                  90240     
 																		 
-		 flatten_6 (Flatten)         multiple                  0         
+		 flatten    (Flatten)        multiple                  0         
 																		 
-		 dense_6 (Dense)             (256)                     916052    
+		 attention    (Attention)    multiple                  0         
+																		 
+		 dense    (Dense)            multiple                  5920524   
+																		 
+		 reshape    (Reshape)        multiple                  0         
 																		 
 		=================================================================
-		Total params: 1,153,502
-		Trainable params: 1,153,502
+		Total params: 6,157,974
+		Trainable params: 6,157,974
 		Non-trainable params: 0
 		_________________________________________________________________
 		
 	During training we discovered that using a pretrained embedding does not work well. Therefore we also train the embedding with all the other layers. The dense layer is the output layers. 
-			
+		
+	We have also added an attention layer as the data contains a lot of empty notes, and we do not want the program to over-predict those.	
 
 	3.4 After training, we let the model take in part of the song, and make it predict the next token step for step. This next token is then added to the total tableture, and will thereafter be used in predicting the following tokens. States of the GRU layers are also passed to the next iteration. This iterative process is repeated till the predicted tab is as large as the original. 
 		In predicting, we have used a temperature input that will generate some randomness in the output, otherwise its prediction will be boring and often does not contain a lot of notes (silences are the most common notes). We use a temperature of 0.99 that is decreased per iteration by multiplying it with 0.997 to make sure it does not become too random in the end. 
 	
 	For example, we have used the song  Money from Pink Floyd:
 
-		G|-------------------------------------------------------------------|
-		D|-----4---3------------------7---7-------5-----------5--7-----------|
-		A|----------------------------------3----------------------3---------|
-		E|-2-----------------------------------------------------------------| 
-
-
-		Predicted Bassline
-		G|--------------------------------------------------------------------|
-		D|-----4---3---4-------4--4---2-4-2---3---2-2-3h4---------------------|
-		A|--------------------------------------------------------------------|
-		E|-2------------------------------------------------------------------| 
-
-
-		Predicted Bassline
-		G|----------------------------------10~--------------------------------|
-		D|-----4---3-------------------------------------6---------------------|
-		A|---------------------------------------7-----------------------------|
+		G|------------------------------------13----------11-------------------|
+		D|-----4---3---2--------0-0-0---------------------------------4--------|
+		A|-----------------2--2--------4-----------9---------------------------|
 		E|-2-------------------------------------------------------------------| 
+
+
+		Predicted Bassline
+		G|-------------------------------------------------------------------|
+		D|-----4---3-----------4---------------------------------------------|
+		A|-------------------------------------------------------------------|
+		E|-2---------------2--------------5----------------------------------| 
+
+
+		Predicted Bassline
+		G|-------------------------------------------------------------------|
+		D|-----4---3---2---------------2-------------------------------------|
+		A|----------------------3--3--3-----------3-----------------------2--|
+		E|-2----------------------------------------------3----------3---3---| 

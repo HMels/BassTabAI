@@ -187,39 +187,27 @@ class AutofillBassTab(tf.keras.Model):
             #trainable=False,
             name='embedding'
             )
-            '''
             self.gru = tf.keras.layers.GRU(rnn_units, return_sequences=True, return_state=True)
             self.flatten =tf.keras.layers.Flatten()
+            self.attention = tf.keras.layers.Attention()
+            #self.conv1d = tf.keras.layers.Conv1D(filters=32, kernel_size=3, activation='relu', padding='same')
+            #self.pooling = tf.keras.layers.GlobalMaxPooling1D()
             self.dense = tf.keras.layers.Dense(dict_size*prediction_length, activation='softmax')
             self.reshape = tf.keras.layers.Reshape((prediction_length, dict_size))
-            '''
-            self.conv1 = tf.keras.layers.Conv1D(64, 3, activation='relu')#, input_shape=embedding_weights.shape[1])
-            self.maxpool1 = tf.keras.layers.MaxPooling1D(2)
-            self.conv2 = tf.keras.layers.Conv1D(128, 3, activation='relu')
-            self.flatten = tf.keras.layers.Flatten()
-            self.dense = tf.keras.layers.Dense(64, activation='relu')
-            self.outputs = tf.keras.layers.Dense(dict_size*prediction_length, activation='softmax')
-            self.reshape = tf.keras.layers.Reshape((prediction_length, dict_size))
-    
-            
             
         @tf.function
         def call(self, inputs, states=None, return_state=False, training=False):
             embedding = self.embedding(inputs, training=True)
-            '''
+            
             if states is None:
                 states = self.gru.get_initial_state(embedding)
             gru, states = self.gru(embedding, initial_state=states, training=training)
             flatten = self.flatten(gru)
-            outputs  = self.dense(flatten, training=training)
-            reshaped_outputs = self.reshape(outputs)
-            '''
-            conv1 = self.conv1(embedding)
-            maxpool1 = self.maxpool1(conv1)
-            conv2 = self.conv2(maxpool1)
-            flatten = self.flatten(conv2)
-            dense = self.dense(flatten)
-            outputs = self.outputs(dense)
+            attention = self.attention([flatten, flatten]) # to make sure silences are not over represented
+            #x = tf.expand_dims(attention, axis=2) 
+            #conv1d = self.conv1d(x)
+            #pooling = self.pooling(conv1d)
+            outputs  = self.dense(attention, training=training)
             reshaped_outputs = self.reshape(outputs)
             
             if return_state:
@@ -227,9 +215,16 @@ class AutofillBassTab(tf.keras.Model):
             else:
                 return reshaped_outputs
             
+            
     def build_model(self,  rnn_units = 128):
+        def kld_loss(y_true, y_pred):
+            return tf.keras.losses.KLDivergence()(y_true, y_pred)
+                
         self.model = self.MyModel(self.dict_size, self.embedding_weights, rnn_units = rnn_units, prediction_length=self.prediction_length)
-        self.model.compile(optimizer='adam', loss='categorical_crossentropy')
+        #self.model.compile(optimizer='adam', loss='categorical_crossentropy')
+        #self.model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
+        self.model.compile(optimizer='adam', loss=kld_loss)
+
         
         
     def plot_learning_curve(self, history):
@@ -350,7 +345,7 @@ class AutofillBassTab(tf.keras.Model):
 
 #%% Parameters
 # Data 
-N = 2000#6000                                                                       # amount of data
+N = 6000                                                                       # amount of data
 window_size = 12                                                               # the input token length
 prediction_length = 6                                                          # the number of tokens to predict per step 
 step = 3                                                                       # number of tokens to jump in training 
@@ -372,12 +367,14 @@ autofillBassTab.load_dataset(embedding_weights, BasslineLibrary)
 
 #%% build and run model
 autofillBassTab.build_model(rnn_units=128)
-autofillBassTab.train_model(BATCH_SIZE=128, EPOCHS=20) 
+autofillBassTab.train_model(BATCH_SIZE=128, EPOCHS=8) 
+
+autofillBassTab.model.summary()
 
 
 #%% predict
 seed=50
-autofillBassTab.compile_model(temperature=1, input_num=window_size)
+autofillBassTab.compile_model(temperature=.8, input_num=window_size)
 
 print("\nReference Bassline - Song: "+BasslineLibrary.names[seed])
 BasslineLibrary.print_detokenize(BasslineLibrary.Data[seed])
